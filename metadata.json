@@ -1,0 +1,7 @@
+{
+  "name": "MedIntelliCare updated ",
+  "description": "A comprehensive healthcare SaaS platform for pharmacies, doctors, and patients featuring AI-powered inventory intelligence and medicine search.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
