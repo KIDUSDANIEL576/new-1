@@ -26,11 +26,12 @@ const Inventory: React.FC = () => {
   const [activeFilters, setActiveFilters] = useState({ category: 'All', stock: 'All' });
 
   useEffect(() => {
+    // Added brandName property to all mock items
     const mockItems: InventoryItem[] = [
-      { id: '1', pharmacyId: 'pharm-1', medicineName: 'Amoxicillin', category: 'Antibiotic', stock: 5, expiryDate: '2024-12-01', costPrice: 12, price: 18, batchNumber: 'B123', brand: 'GSK', sku: 'AMX-001' },
-      { id: '2', pharmacyId: 'pharm-1', medicineName: 'Paracetamol', category: 'Painkiller', stock: 120, expiryDate: '2025-05-15', costPrice: 2, price: 5, batchNumber: 'B456', brand: 'Dolo', sku: 'PAR-002' },
-      { id: '3', pharmacyId: 'pharm-1', medicineName: 'Ibuprofen', category: 'Painkiller', stock: 45, expiryDate: '2024-11-20', costPrice: 5, price: 9, batchNumber: 'B789', brand: 'Advil', sku: 'IBU-003' },
-      { id: '4', pharmacyId: 'pharm-1', medicineName: 'Metformin', category: 'Medicine', stock: 8, expiryDate: '2025-01-10', costPrice: 15, price: 25, batchNumber: 'B101', brand: 'Glucophage', sku: 'MET-004' },
+      { id: '1', pharmacyId: 'pharm-1', medicineName: 'Amoxicillin', brandName: 'GSK', category: 'Antibiotic', stock: 5, expiryDate: '2024-12-01', costPrice: 12, price: 18, batchNumber: 'B123', brand: 'GSK', sku: 'AMX-001' },
+      { id: '2', pharmacyId: 'pharm-1', medicineName: 'Paracetamol', brandName: 'Dolo', category: 'Painkiller', stock: 120, expiryDate: '2025-05-15', costPrice: 2, price: 5, batchNumber: 'B456', brand: 'Dolo', sku: 'PAR-002' },
+      { id: '3', pharmacyId: 'pharm-1', medicineName: 'Ibuprofen', brandName: 'Advil', category: 'Painkiller', stock: 45, expiryDate: '2024-11-20', costPrice: 5, price: 9, batchNumber: 'B789', brand: 'Advil', sku: 'IBU-003' },
+      { id: '4', pharmacyId: 'pharm-1', medicineName: 'Metformin', brandName: 'Glucophage', category: 'Medicine', stock: 8, expiryDate: '2025-01-10', costPrice: 15, price: 25, batchNumber: 'B101', brand: 'Glucophage', sku: 'MET-004' },
     ];
     setItems(mockItems);
   }, []);

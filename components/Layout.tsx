@@ -4,32 +4,29 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole, PharmacyPlan, SystemAnnouncement, AuditLog, SystemSafety } from '../types';
 import { mockApi } from '../services/mockApi';
+import NotificationCenter from './NotificationCenter';
 import { 
   LayoutDashboard, Package, ShoppingCart, Stethoscope, Search, LogOut,
   Bell, Settings as SettingsIcon, ShieldCheck, Store, Share2, Users,
   RotateCcw, History, Building2, Database, BarChart3, Server, Zap,
-  Snowflake, CreditCard, Target, Megaphone, X, Activity
+  Snowflake, CreditCard, Target, Megaphone, X, Activity, FileText
 } from 'lucide-react';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [showNotifications, setShowNotifications] = useState(false);
   const [announcements, setAnnouncements] = useState<SystemAnnouncement[]>([]);
-  const [activities, setActivities] = useState<AuditLog[]>([]);
   const [safety, setSafety] = useState<SystemSafety | null>(null);
   const [isHolidayMode, setIsHolidayMode] = useState(() => localStorage.getItem('medintelli_holiday') === 'true');
 
   useEffect(() => {
     const fetchData = async () => {
-      const [annData, auditData, safetyData] = await Promise.all([
+      const [annData, safetyData] = await Promise.all([
         mockApi.getAnnouncements(),
-        mockApi.getAuditLogs(),
         mockApi.getSystemSafety()
       ]);
       setAnnouncements(annData.filter(a => a.active));
-      setActivities(auditData.slice(0, 10)); // Show latest 10 activities
       setSafety(safetyData);
     };
     
@@ -51,18 +48,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { icon: Building2, label: 'Manage Nodes', path: '/super-admin/pharmacies', roles: [UserRole.SUPER_ADMIN] },
     { icon: Database, label: 'Global Stock', path: '/super-admin/inventory', roles: [UserRole.SUPER_ADMIN] },
     { icon: Target, label: 'Plan Control', path: '/super-admin/plans', roles: [UserRole.SUPER_ADMIN] },
-    { icon: Store, label: 'Supplier Queue', path: '/super-admin/marketplace-approvals', roles: [UserRole.SUPER_ADMIN] },
-    { icon: BarChart3, label: 'Market Metrics', path: '/super-admin/reports', roles: [UserRole.SUPER_ADMIN] },
-    { icon: Server, label: 'System Health', path: '/super-admin/health', roles: [UserRole.SUPER_ADMIN] },
+    { icon: FileText, label: 'Audit Trail', path: '/super-admin/audit', roles: [UserRole.SUPER_ADMIN] },
     { icon: Search, label: 'Medicine Search', path: '/search', roles: [UserRole.PATIENT, UserRole.SUPER_ADMIN] },
-    { icon: Package, label: 'Inventory', path: '/inventory', roles: [UserRole.PHARMACY_ADMIN, UserRole.PHARMACIST] },
+    { icon: Package, label: 'Inventory', path: '/inventory', roles: [UserRole.PHARMACY_ADMIN, UserRole.PHARMACIST, UserRole.SUPER_ADMIN] },
     { icon: RotateCcw, label: 'Correction', path: '/stock-adjustment', roles: [UserRole.PHARMACIST, UserRole.PHARMACY_ADMIN] },
     { icon: ShoppingCart, label: 'POS Terminal', path: '/sales', roles: [UserRole.PHARMACY_ADMIN, UserRole.PHARMACIST, UserRole.SALES_PERSON], planRequired: PharmacyPlan.STANDARD },
     { icon: History, label: 'My Sales', path: '/my-sales', roles: [UserRole.SALES_PERSON, UserRole.PHARMACIST], planRequired: PharmacyPlan.STANDARD },
-    { icon: Stethoscope, label: 'Prescriptions', path: '/prescriptions', roles: [UserRole.DOCTOR, UserRole.PHARMACIST, UserRole.PHARMACY_ADMIN] },
+    { icon: Stethoscope, label: 'Prescriptions', path: '/prescriptions', roles: [UserRole.DOCTOR, UserRole.PHARMACIST, UserRole.PHARMACY_ADMIN, UserRole.SUPER_ADMIN] },
     { icon: Users, label: 'Staff Control', path: '/staff', roles: [UserRole.PHARMACY_ADMIN], planRequired: PharmacyPlan.STANDARD },
-    { icon: Store, label: 'Marketplace', path: '/marketplace', roles: [UserRole.PHARMACY_ADMIN, UserRole.SUPER_ADMIN], planRequired: PharmacyPlan.PLATINUM },
-    { icon: Share2, label: 'Referrals', path: '/referrals', roles: [UserRole.PHARMACY_ADMIN, UserRole.SUPER_ADMIN] },
+    { icon: Store, label: 'Marketplace', path: '/marketplace', roles: [UserRole.PHARMACY_ADMIN, UserRole.SUPER_ADMIN, UserRole.SUPPLIER, UserRole.SALES_PERSON], planRequired: PharmacyPlan.PLATINUM },
+    { icon: Share2, label: 'Referrals', path: '/referrals', roles: [UserRole.PHARMACY_ADMIN, UserRole.SUPER_ADMIN, UserRole.DOCTOR] },
     { icon: CreditCard, label: 'Subscription', path: '/subscription', roles: [UserRole.PHARMACY_ADMIN] },
     { icon: SettingsIcon, label: 'Settings', path: '/settings', roles: Object.values(UserRole) },
   ];
@@ -78,7 +73,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   });
 
   const appStyle = safety?.bg_url 
-    ? { backgroundImage: `url(${safety.bg_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    ? { backgroundImage: `url(${safety.bg_url})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }
     : {};
 
   return (
@@ -89,7 +84,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="p-6">
           <h1 className={`text-2xl font-bold flex items-center gap-2 ${isHolidayMode ? 'text-rose-600' : 'text-blue-600'}`}>
             <span className={`p-1 rounded text-white shadow-lg ${isHolidayMode ? 'bg-emerald-600' : 'bg-blue-600'}`}>
-              {safety?.logo_url ? <img src={safety.logo_url} className="w-5 h-5 object-contain" alt="Logo" /> : <Package size={20} />}
+              {safety?.logo_url ? <img src={safety.logo_url} className="w-5 h-5 object-contain" alt="L" /> : <Package size={20} />}
             </span>
             MedIntelli
           </h1>
@@ -139,41 +134,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             {menuItems.find(i => i.path === location.pathname)?.label || 'System Entry'}
           </h2>
           <div className="flex items-center gap-4 relative">
-            <button 
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all relative"
-            >
-              <Bell size={20} />
-              {activities.length > 0 && (
-                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 border-2 border-white rounded-full"></span>
-              )}
-            </button>
-
-            {showNotifications && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)}></div>
-                <div className="absolute top-full right-0 mt-2 w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 p-4 z-50 animate-in fade-in slide-in-from-top-2">
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 px-2">Live Activity Stream</h4>
-                  <div className="space-y-1 max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
-                    {activities.map(act => (
-                      <div key={act.id} className="flex items-start gap-3 p-3 hover:bg-slate-50 rounded-2xl transition-all">
-                        <div className="p-2 rounded-xl bg-blue-50 text-blue-600 shrink-0">
-                           <Activity size={16}/>
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-900 leading-tight">{act.action}</p>
-                          <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2">{act.details}</p>
-                          <p className="text-[9px] text-slate-300 mt-1 font-black uppercase">{act.user} • {new Date(act.timestamp).toLocaleTimeString()}</p>
-                        </div>
-                      </div>
-                    ))}
-                    {activities.length === 0 && (
-                      <div className="p-8 text-center text-slate-300 font-bold italic">No recent activity detected.</div>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
+            <NotificationCenter />
 
             <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 font-black shadow-sm">
               {user?.name?.[0].toUpperCase()}

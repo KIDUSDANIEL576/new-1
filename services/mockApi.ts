@@ -2,294 +2,268 @@
 import { 
   Plan, User, UserRole, Pharmacy, PharmacyPlan, Sale, 
   InventoryItem, UpgradeRequest, PatientPlan, SecurityLog, 
-  SystemSafety, HolidayTheme, SystemVersion, BonusGrant, FeedbackEntry,
-  Pharmaceutical, ProductIntelligence, SystemAnnouncement, IntegrityAlert,
-  RevenueLedger, AuditLog
+  SystemSafety, SystemAnnouncement, IntegrityAlert,
+  RevenueLedger, AuditLog, B2BRequest, B2BBid, B2BTransaction, Notification,
+  B2BTransactionStatus, StaffMember, ProductIntelligence
 } from '../types';
 
-export let pharmacies: Pharmacy[] = [
-  { id: 'p1', name: 'Abbebe Pharmacy', email: 'admin@abbebe.com', phone: '0911223344', address: 'Bole, AA', plan: PharmacyPlan.PLATINUM, status: 'Active', expiryDate: '2025-12-24', planStartDate: '2024-12-24', staffCount: 12, createdAt: '2024-12-24', lastLogin: '2024-12-25 10:30 AM' },
-  { id: 'p2', name: 'Kidus Pharmacy', email: 'contact@kidus.com', phone: '0911556677', address: 'Piassa, AA', plan: PharmacyPlan.STANDARD, status: 'Active', expiryDate: '2025-11-20', planStartDate: '2024-11-20', staffCount: 8, createdAt: '2024-11-20', lastLogin: '2024-12-24 09:15 AM' },
-];
-
-export let doctors: User[] = [
-  { id: 'd1', name: 'Dr. Jane Smith', email: 'jane@clinic.com', role: UserRole.DOCTOR, clinicName: 'Smith Health', status: 'Active', createdAt: '2023-11-20', total_prescriptions: 142, e_signature_url: 'https://placehold.co/200x100?text=Jane+Smith+Sig' }
-];
-
-export let patients: User[] = [
-  { id: 'pat1', name: 'Abebe Kebede', email: 'abebe@mail.com', role: UserRole.PATIENT, plan: PatientPlan.FREE, patientStatus: 'active', createdAt: '2024-10-01' },
-  { id: 'pat2', name: 'Sara Melaku', email: 'sara@mail.com', role: UserRole.PATIENT, plan: PatientPlan.FREE, patientStatus: 'pending_approval', createdAt: '2024-12-25' }
-];
-
-export let upgradeRequests: UpgradeRequest[] = [
-  { id: 'req-1', pharmacyId: 'p2', pharmacyName: 'Kidus Pharmacy', requestedPlan: PharmacyPlan.PLATINUM, status: 'pending', createdAt: new Date().toISOString() }
-];
-
-export let revenueLedger: RevenueLedger = {
-  aggregateTotal: 14250,
-  nrr: 114.5,
-  churnRate: 1.2,
-  activeNodes: 42,
-  bySource: {
-    basicPlans: 2450,
-    standardPlans: 5600,
-    platinumPlans: 6200,
-    doctors: 1200,
-    patients: 800,
-    pharmacies: 1500,
-  },
-  history: {
-    weekly: [
-      { name: 'Mon', revenue: 1200, churned: 0 },
-      { name: 'Tue', revenue: 1500, churned: 49 },
-      { name: 'Wed', revenue: 900, churned: 0 },
-      { name: 'Thu', revenue: 2100, churned: 0 },
-      { name: 'Fri', revenue: 1800, churned: 0 },
-      { name: 'Sat', revenue: 2400, churned: 99 },
-      { name: 'Sun', revenue: 2200, churned: 0 },
-    ],
-    monthly: [
-      { name: 'Week 1', revenue: 8400, churned: 149 },
-      { name: 'Week 2', revenue: 9100, churned: 0 },
-      { name: 'Week 3', revenue: 7800, churned: 99 },
-      { name: 'Week 4', revenue: 10200, churned: 49 },
-    ],
-    yearly: [
-      { name: 'Jan', revenue: 32000, churned: 400 },
-      { name: 'Feb', revenue: 35000, churned: 250 },
-      { name: 'Mar', revenue: 38000, churned: 300 },
-      { name: 'Apr', revenue: 36000, churned: 600 },
-      { name: 'May', revenue: 41000, churned: 150 },
-      { name: 'Jun', revenue: 44000, churned: 200 },
-      { name: 'Jul', revenue: 42000, churned: 450 },
-      { name: 'Aug', revenue: 48000, churned: 100 },
-      { name: 'Sep', revenue: 51000, churned: 50 },
-      { name: 'Oct', revenue: 55000, churned: 120 },
-      { name: 'Nov', revenue: 59000, churned: 80 },
-      { name: 'Dec', revenue: 64000, churned: 40 },
-    ]
+// Root Identity Vault - Persistence Layer
+export let users: User[] = [
+  { 
+    id: 'root-01', 
+    email: 'admin@medintellicare.com', 
+    password: 'admin', 
+    name: 'Super Admin', 
+    role: UserRole.SUPER_ADMIN, 
+    isActive: true, 
+    isApproved: true,
+    isVerified: true,
+    createdAt: '2023-01-01' 
   }
-};
+];
+
+export let b2bRequests: B2BRequest[] = [];
+export let b2bBids: B2BBid[] = [];
+export let b2bTransactions: B2BTransaction[] = [];
+export let notifications: Notification[] = [];
+export let auditLogs: AuditLog[] = [
+  { id: '1', timestamp: new Date().toISOString(), action: 'Node Initialization', user: 'system', details: 'Hub Pegasus connection online.' }
+];
+
+export let pharmacies: Pharmacy[] = [
+  { id: 'pharm-1', name: 'Abbebe Pharmacy', email: 'admin@abbebe.com', phone: '0911223344', address: 'Bole, AA', plan: PharmacyPlan.PLATINUM, status: 'Active', createdAt: '2024-12-24', staffCount: 12 },
+];
 
 export const mockPlans: Plan[] = [
   {
-    id: 'basic',
-    name: 'Basic Plan',
-    description: 'Essential tools for small pharmacies.',
+    id: 'p-basic',
+    name: 'Basic Node',
     pricing: { monthly: 49, yearly: 490, yearlyDiscount: 15 },
     limits: { inventoryItems: 200, staffMembers: 0 },
+    description: 'Essential connectivity for small independent pharmacies.',
     features: [
-      { id: '1', name: 'Inventory tracking', description: '200 Items limit' },
-      { id: '2', name: 'Alerts', description: 'Low-stock & Expiry alerts' }
+      { id: 'f1', name: 'Inventory Tracking', description: 'Real-time stock monitoring' },
+      { id: 'f2', name: 'Digital Prescriptions', description: 'Receive clinical directives' }
     ]
   },
   {
-    id: 'standard',
-    name: 'Standard Plan',
-    description: 'Advanced management for growing pharmacies.',
-    isPopular: true,
+    id: 'p-standard',
+    name: 'Standard Node',
     pricing: { monthly: 99, yearly: 990, yearlyDiscount: 15 },
-    limits: { inventoryItems: 300, staffMembers: 5 },
+    limits: { inventoryItems: 300, staffMembers: 'unlimited' },
+    description: 'Full POS and staff management for growing pharmacies.',
+    isPopular: true,
     features: [
-      { id: '1', name: 'Sales POS', description: 'Full terminal support' },
-      { id: '2', name: 'Staff Management', description: 'Up to 5 authorized users' }
-    ]
-  },
-  {
-    id: 'platinum',
-    name: 'Platinum Plan',
-    description: 'The ultimate intelligence suite.',
-    pricing: { monthly: 149, yearly: 1490, yearlyDiscount: 20 },
-    limits: { inventoryItems: 'unlimited', staffMembers: 'unlimited' },
-    features: [
-      { id: '1', name: 'B2B Marketplace', description: 'Direct supplier ordering' },
-      { id: '2', name: 'Advanced Analytics', description: 'AI insights & predictions' }
+      { id: 'f1', name: 'Inventory Tracking', description: 'Real-time stock monitoring' },
+      { id: 'f2', name: 'Digital Prescriptions', description: 'Receive clinical directives' },
+      { id: 'f3', name: 'Sales Terminal', description: 'Full POS functionality' }
     ]
   }
 ];
 
-export let systemSafety: SystemSafety = {
-  kill_switch_active: false,
-  pause_requests: false,
-  rate_limit_per_day: 50,
-  system_version: '4.0 Pegasus',
-  primary_color: '#007E85'
+// Helper: Notification Dispatcher
+const createNotification = (data: Partial<Notification>) => {
+  const newNotif: Notification = {
+    id: `notif-${Date.now()}`,
+    type: data.type || 'SYSTEM_ALERT',
+    title: data.title || 'System Alert',
+    message: data.message || '',
+    isRead: false,
+    createdAt: new Date().toISOString(),
+    ...data
+  };
+  notifications.unshift(newNotif);
+  return newNotif;
 };
 
-export let announcements: SystemAnnouncement[] = [
-  { id: 'a1', title: 'System Protocol Update', message: 'All pharmacy nodes must verify e-signatures by EOD.', type: 'warning', active: true },
-  { id: 'a2', title: 'Network Maintenance', message: 'The hub will undergo optimization at 02:00 UTC.', type: 'info', active: true }
-];
-
-export let integrityAlerts: IntegrityAlert[] = [
-  { id: 'ia1', timestamp: new Date().toISOString(), description: 'Duplicate Email Conflict: admin@abbebe.com found in two nodes.', impact: 'high' },
-  { id: 'ia2', timestamp: new Date().toISOString(), description: 'Anomalous Traffic: 15 failed login attempts from Sector 7 IP.', impact: 'medium' },
-  { id: 'ia3', timestamp: new Date().toISOString(), description: 'Data Inconsistency: Sale REC-441 linked to deleted Node P-09.', impact: 'high' }
-];
-
-// Added mock audit logs
-export let auditLogs: AuditLog[] = [
-  { id: '1', timestamp: new Date().toISOString(), action: 'System Initialization', user: 'root', details: 'Core telemetry protocols online.' },
-  { id: '2', timestamp: new Date().toISOString(), action: 'Node Connection', user: 'admin@abbebe.com', details: 'Abbebe Pharmacy node synchronized.' }
-];
+// Helper: Audit Logger
+const logAudit = (action: string, user: string, details: string) => {
+  auditLogs.unshift({
+    id: `audit-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    action,
+    user,
+    details
+  });
+};
 
 export const mockApi = {
-  getRevenueLedger: async (): Promise<RevenueLedger> => revenueLedger,
-  
-  getInfrastructurePulse: async () => ({
-    dau: [
-      { name: 'Mon', count: 1200 },
-      { name: 'Tue', count: 1450 },
-      { name: 'Wed', count: 1100 },
-      { name: 'Thu', count: 1800 },
-      { name: 'Fri', count: 1650 },
-      { name: 'Sat', count: 900 },
-      { name: 'Sun', count: 850 },
-    ],
-    tenantGrowth: [
-      { name: 'Jan', count: 12 },
-      { name: 'Feb', count: 18 },
-      { name: 'Mar', count: 25 },
-      { name: 'Apr', count: 32 },
-      { name: 'May', count: 42 },
-    ]
-  }),
+  // --- Auth & Root Gatekeeping ---
+  login: async (email: string, password?: string) => {
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    
+    if (!user) return { success: false, message: "Access Denied: Node identity not found in the hub database." };
+    if (!user.isApproved) return { success: false, message: "ACCOUNT UNDER REVIEW: Access is restricted until admin verifies identity and payment." };
+    
+    if (user.password && password !== user.password) {
+      return { success: false, message: "Credential mismatch: Incorrect password protocol." };
+    }
 
-  checkEmailExists: async (email: string) => {
-    const allEmails = [
-      ...pharmacies.map(p => p.email),
-      ...doctors.map(d => d.email),
-      ...patients.map(pat => pat.email)
-    ];
-    return allEmails.includes(email);
+    return { success: true, user };
+  },
+
+  signup: async (data: Partial<User>) => {
+    const existing = users.find(u => u.email === data.email);
+    if (existing) throw new Error("Email already registered in the identity vault.");
+
+    const newUser: User = {
+      id: `u-${Math.random().toString(36).substr(2, 9)}`,
+      email: data.email || '',
+      name: data.name || '',
+      phone: data.phone || '',
+      role: data.role || UserRole.RETAIL_PHARMACY,
+      purpose: data.purpose || 'General Access',
+      isActive: false,
+      isApproved: false,
+      isVerified: false,
+      createdAt: new Date().toISOString()
+    };
+
+    users.push(newUser);
+    
+    createNotification({
+      type: 'NEW_SIGNUP',
+      title: 'New Access Request',
+      message: `${newUser.name} requested access as ${newUser.role}.`
+    });
+
+    logAudit('SIGNUP_INTENT', 'guest', `New enrollment protocol started for ${newUser.email}`);
+    
+    return { success: true, message: "ACCOUNT UNDER REVIEW" };
+  },
+
+  // --- Admin Control Panel ---
+  getRegistrationQueue: async () => users.filter(u => !u.isApproved),
+  
+  approveAndDispatch: async (userId: string, credentials: { password?: string, plan?: any }) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) throw new Error("User node not found");
+
+    user.isApproved = true;
+    user.isActive = true;
+    user.password = credentials.password || 'MED-INIT-123';
+    user.plan = credentials.plan;
+
+    // Auto-create Pharmacy Node if role is Retail Pharmacy
+    if (user.role === UserRole.RETAIL_PHARMACY) {
+      const newPharm: Pharmacy = {
+        id: `pharm-${Math.random().toString(36).substr(2, 5)}`,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || '',
+        address: 'Pending Dispatch Location',
+        plan: credentials.plan || PharmacyPlan.BASIC,
+        status: 'Active',
+        staffCount: 1,
+        createdAt: new Date().toISOString()
+      };
+      pharmacies.push(newPharm);
+      user.organizationId = newPharm.id;
+      user.pharmacyId = newPharm.id;
+    }
+
+    logAudit('ACCESS_DISPATCHED', 'super_admin', `Authorized access and password for ${user.email}. Role: ${user.role}`);
+    return user;
+  },
+
+  rejectRegistration: async (userId: string) => {
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx !== -1) {
+      const u = users[idx];
+      users.splice(idx, 1);
+      logAudit('REGISTRATION_REJECTED', 'super_admin', `Decommissioned request from ${u.email}`);
+    }
   },
 
   getPharmacies: async () => [...pharmacies],
-  addPharmacy: async (data: any) => {
-    const newP = { ...data, id: `p${Date.now()}`, lastLogin: 'Never', staffCount: 0, createdAt: new Date().toISOString(), status: 'Active' };
-    pharmacies.push(newP);
-    return newP;
-  },
-  updatePharmacy: async (id: string, data: any) => {
-    const idx = pharmacies.findIndex(p => p.id === id);
-    if (idx !== -1) pharmacies[idx] = { ...pharmacies[idx], ...data };
-    return pharmacies[idx];
-  },
-  deletePharmacy: async (id: string) => {
-    const idx = pharmacies.findIndex(p => p.id === id);
-    if (idx !== -1) pharmacies.splice(idx, 1);
-  },
-  togglePharmacyStatus: async (id: string) => {
-    const p = pharmacies.find(pharm => pharm.id === id);
-    if (p) p.status = p.status === 'Active' ? 'Inactive' : 'Active';
-  },
-  setPharmacyCredentials: async (id: string, creds: any) => {
-    console.log(`Setting credentials for pharmacy ${id}:`, creds);
-  },
-  forceUpgrade: async (id: string, plan: PharmacyPlan) => {
-    const p = pharmacies.find(pharm => pharm.id === id);
-    if (p) p.plan = plan;
-  },
+  getDoctors: async () => users.filter(u => u.role === UserRole.RETAIL_PHARMACY && u.isApproved),
+  getPatients: async () => users.filter(u => u.role === UserRole.RETAIL_PHARMACY && u.isApproved),
+  getSystemSafety: async (): Promise<SystemSafety> => ({ kill_switch_active: false, pause_requests: false, rate_limit_per_day: 50, system_version: '4.2 Pegasus Root', primary_color: '#007E85' }),
   
-  getDoctors: async () => [...doctors],
-  addDoctor: async (data: any) => {
-    const newD = { ...data, id: `d${Date.now()}`, role: UserRole.DOCTOR, total_prescriptions: 0, status: 'Active', createdAt: new Date().toISOString() };
-    doctors.push(newD);
-    return newD;
-  },
-  updateDoctor: async (id: string, data: any) => {
-    const idx = doctors.findIndex(d => d.id === id);
-    if (idx !== -1) doctors[idx] = { ...doctors[idx], ...data };
-    return doctors[idx];
-  },
-  deleteDoctor: async (id: string) => {
-    const idx = doctors.findIndex(d => d.id === id);
-    if (idx !== -1) doctors.splice(idx, 1);
-  },
-  setDoctorCredentials: async (id: string, creds: any) => {
-    console.log(`Setting credentials for doctor ${id}:`, creds);
-  },
-
-  getPatients: async () => [...patients],
-  approvePatient: async (id: string, amount: number) => {
-    const p = patients.find(pat => pat.id === id);
-    if (p) {
-      p.patientStatus = 'active';
-      p.plan = PatientPlan.PAID;
-      revenueLedger.aggregateTotal += amount;
-      revenueLedger.bySource.patients += amount;
-    }
-  },
-  rejectPatient: async (id: string) => {
-    const p = patients.find(pat => pat.id === id);
-    if (p) p.patientStatus = 'rejected';
-  },
-  deletePatient: async (id: string) => {
-    const idx = patients.findIndex(p => p.id === id);
-    if (idx !== -1) patients.splice(idx, 1);
-  },
-
-  getUpgradeRequests: async () => [...upgradeRequests],
-  requestUpgrade: async (pharmacyId: string, plan: PharmacyPlan) => {
-    const ph = pharmacies.find(p => p.id === pharmacyId);
-    if (!ph) return;
-    upgradeRequests.push({
-      id: `req-${Date.now()}`,
-      pharmacyId,
-      pharmacyName: ph.name,
-      requestedPlan: plan,
-      status: 'pending',
-      createdAt: new Date().toISOString()
-    });
-  },
-  approveUpgrade: async (id: string) => {
-    const req = upgradeRequests.find(r => r.id === id);
-    if (req) {
-      req.status = 'approved';
-      const ph = pharmacies.find(p => p.id === req.pharmacyId);
-      if (ph) ph.plan = req.requestedPlan;
-      const amount = req.requestedPlan === PharmacyPlan.PLATINUM ? 149 : 99;
-      revenueLedger.aggregateTotal += amount;
-    }
-  },
-  rejectUpgrade: async (id: string) => {
-    const req = upgradeRequests.find(r => r.id === id);
-    if (req) req.status = 'rejected';
-  },
-  
-  getPlans: async () => [...mockPlans],
-  updatePlan: async (id: string, data: any) => {
-    const idx = mockPlans.findIndex(p => p.id === id);
-    if (idx !== -1) mockPlans[idx] = { ...mockPlans[idx], ...data };
-  },
-
-  getSystemSafety: async () => ({ ...systemSafety }),
-  updateSafety: async (data: Partial<SystemSafety>) => {
-    systemSafety = { ...systemSafety, ...data };
-    return systemSafety;
-  },
-
-  getAuditLogs: async () => [...auditLogs],
-  getAnnouncements: async () => [...announcements],
-  getHolidayThemes: async () => [],
-  getSystemVersions: async () => [],
-  getBonusGrants: async () => [],
-  getFeedback: async () => [],
-  getGlobalSales: async () => [],
-  getGlobalInventory: async () => [],
-  getProductIntelligence: async () => ({
-    avgTimeToFirstInventory: 1.2,
-    avgTimeToFirstSale: 3.5,
-    featureAdoption: [
-      { feature: 'AI Restock', adoptionRate: 85 }, 
-      { feature: 'Digital Rx', adoptionRate: 65 },
-      { feature: 'B2B Marketplace', adoptionRate: 42 },
-      { feature: 'Patient Mobile Search', adoptionRate: 91 }
-    ],
-    paywallHits: 1250,
-    upgradePressure: []
+  getRevenueLedger: async (): Promise<RevenueLedger> => ({
+    aggregateTotal: 14250, nrr: 114.5, churnRate: 1.2, activeNodes: pharmacies.length,
+    bySource: { basicPlans: 2450, standardPlans: 5600, platinumPlans: 6200, doctors: 1200, patients: 800, pharmacies: 1500 },
+    history: { weekly: [], monthly: [], yearly: [] }
   }),
-  getSuppliers: async () => [],
-  getSecurityLogs: async () => [],
-  getIntegrityAlerts: async () => [...integrityAlerts]
+
+  // --- B2B Marketplace Support ---
+  listAnonymousRequests: async () => b2bRequests.filter(r => r.status === 'open' || r.status === 'bid_received'),
+  listMyTransactions: async (orgId: string) => b2bTransactions.filter(t => t.pharmacyId === orgId || t.supplierId === orgId),
+  getNotifications: async (orgId?: string) => notifications.filter(n => !n.targetOrgId || n.targetOrgId === orgId),
+  markNotificationRead: async (id: string) => { const n = notifications.find(notif => notif.id === id); if (n) n.isRead = true; },
+  getAuditLogs: async () => [...auditLogs],
+  getIntegrityAlerts: async (): Promise<IntegrityAlert[]> => [
+    { id: 'a1', timestamp: new Date().toISOString(), description: 'Unapproved node attempt blocked from IP 192.168.1.1', impact: 'low' }
+  ],
+  getAnnouncements: async (): Promise<SystemAnnouncement[]> => [],
+  getPlans: async (): Promise<Plan[]> => mockPlans,
+  checkEmailExists: async (email: string) => users.some(u => u.email === email),
+  updateSafety: async (d: any) => ({ ...d }),
+  getProductIntelligence: async (): Promise<ProductIntelligence> => ({ avgTimeToFirstInventory: 2, avgTimeToFirstSale: 4, paywallHits: 1240, featureAdoption: [] }),
+  getGlobalInventory: async (): Promise<InventoryItem[]> => [],
+  getGlobalSales: async (): Promise<Sale[]> => [],
+  getUpgradeRequests: async (): Promise<UpgradeRequest[]> => [],
+  getSecurityLogs: async (): Promise<SecurityLog[]> => [],
+  getInfrastructurePulse: async () => ({ dau: [], tenantGrowth: [] }),
+  updatePharmacy: async (i: any, d: any) => d,
+  togglePharmacyStatus: async (id: string) => {},
+  forceUpgrade: async (id: string, plan: PharmacyPlan) => {},
+  deletePharmacy: async (id: string) => {},
+  addDoctor: async (d: any) => d,
+  updateDoctor: async (i: any, d: any) => {},
+  deleteDoctor: async (i: any) => {},
+  approvePatient: async (i: any, a: any) => {},
+  rejectPatient: async (i: any) => {},
+  deletePatient: async (i: any) => {},
+  approveUpgrade: async (i: any) => {},
+  rejectUpgrade: async (i: any) => {},
+  requestUpgrade: async (pId: any, plan: any) => {},
+  setPharmacyCredentials: async (i: any, c: any) => {},
+  setDoctorCredentials: async (i: any, c: any) => {},
+  updatePlan: async (i: any, d: any) => {},
+  addPharmacy: async (data: any) => {
+    const newPharm: Pharmacy = {
+      id: `pharm-${Math.random().toString(36).substr(2, 5)}`,
+      status: 'Active', staffCount: 1, createdAt: new Date().toISOString(), ...data
+    };
+    pharmacies.push(newPharm);
+    return newPharm;
+  },
+  createB2BRequest: async (orgId: string, data: any) => {
+    const newReq: B2BRequest = {
+      id: `req-${Math.random().toString(36).substr(2, 9)}`,
+      anonymousPharmacyId: `PHARM-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+      actualPharmacyId: orgId, status: 'open', isIdentityRevealed: false, bidsCount: 0, createdAt: new Date().toISOString(), ...data
+    };
+    b2bRequests.unshift(newReq);
+    return newReq;
+  },
+  submitB2BBid: async (orgId: string, data: any) => {
+    const newBid: B2BBid = {
+      id: `bid-${Math.random().toString(36).substr(2, 9)}`,
+      anonymousSupplierId: `SUPP-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+      actualSupplierId: orgId, status: 'submitted', isIdentityRevealed: false, createdAt: new Date().toISOString(),
+      totalPrice: data.pricePerUnit * (data.quantity || 100),
+      deliveryDate: new Date(Date.now() + (data.deliveryDays * 86400000)).toISOString(), ...data
+    };
+    b2bBids.unshift(newBid);
+    return newBid;
+  },
+  acceptB2BBid: async (bidId: string, orgId: string) => {
+    const bid = b2bBids.find(b => b.id === bidId);
+    if (!bid) throw new Error("Bid not found");
+    const tx: B2BTransaction = {
+      id: `tx-${Math.random().toString(36).substr(2, 9)}`,
+      requestId: bid.requestId, bidId: bid.id, pharmacyId: orgId, supplierId: bid.actualSupplierId,
+      medicineName: 'Consolidated Batch', quantity: 100, unitPrice: bid.pricePerUnit, totalAmount: bid.totalPrice,
+      status: 'accepted', paymentStatus: 'pending', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+    };
+    b2bTransactions.unshift(tx);
+    return { success: true, transaction: tx, supplierDetails: { name: 'Supplier Hub', phone: '09xxxxxxxx', address: 'Bole' } };
+  },
+  updateTransactionStatus: async (txId: string, status: B2BTransactionStatus) => {
+    const tx = b2bTransactions.find(t => t.id === txId);
+    if (tx) { tx.status = status; tx.updatedAt = new Date().toISOString(); }
+  },
+  getSuppliers: async () => [{ id: 'supp-1', name: 'Global Pharma', category: 'Distributor', date: '2024-01-01', contact: 'Sales Hub' }]
 };

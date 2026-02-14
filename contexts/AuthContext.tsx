@@ -1,10 +1,11 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole, PharmacyPlan, PatientPlan } from '../types';
+import { User, UserRole } from '../types';
+import { mockApi } from '../services/mockApi';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, role: UserRole) => Promise<{ success: boolean; message?: string }>;
+  login: (email: string, password?: string) => Promise<{ success: boolean; message?: string }>;
   register: (data: Partial<User>) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
   loading: boolean;
@@ -24,40 +25,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   }, []);
 
-  const login = async (email: string, role: UserRole) => {
-    // In a real app, this would query the backend users table
-    const mockUser: User = {
-      id: `u-${Math.random().toString(36).substr(2, 9)}`,
-      email,
-      name: email.split('@')[0],
-      role,
-      plan: role === UserRole.PHARMACY_ADMIN ? PharmacyPlan.PLATINUM : 
-            role === UserRole.PATIENT ? PatientPlan.PAID : undefined,
-      pharmacyId: role.includes('Pharmacy') || role === UserRole.PHARMACIST ? 'pharm-1' : undefined,
-      patientStatus: role === UserRole.PATIENT ? 'active' : undefined,
-      createdAt: new Date().toISOString()
-    };
-
-    // Patient status checks from spec 7.1
-    if (role === UserRole.PATIENT) {
-      // Simulate status check logic
-      const status: any = 'active'; // This would be fetched from DB
-      if (status === 'pending_approval') {
-        return { success: false, message: "Your account is under review. Please wait for admin approval." };
-      }
-      if (status === 'rejected') {
-        return { success: false, message: "Your account was not approved. Contact support if needed." };
-      }
+  const login = async (email: string, password?: string) => {
+    const result = await mockApi.login(email, password);
+    
+    if (result.success && result.user) {
+      setUser(result.user);
+      localStorage.setItem('medintellicare_user', JSON.stringify(result.user));
+      return { success: true };
     }
-
-    setUser(mockUser);
-    localStorage.setItem('medintellicare_user', JSON.stringify(mockUser));
-    return { success: true };
+    
+    return { success: false, message: result.message };
   };
 
   const register = async (data: Partial<User>) => {
-    // Mock registration logic from spec 7.2
-    return { success: true, message: "Registration successful! Your account is under review." };
+    try {
+      const res = await mockApi.signup(data);
+      return { success: true, message: res.message };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
   };
 
   const logout = () => {

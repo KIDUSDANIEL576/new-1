@@ -13,9 +13,10 @@ const StockAdjustment: React.FC = () => {
   const [reason, setReason] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
 
+  // Added brandName property to mock items
   const mockInventory: InventoryItem[] = [
-    { id: '1', pharmacyId: 'pharm-1', medicineName: 'Amoxicillin', category: 'Antibiotic', stock: 5, expiryDate: '2024-12-01', costPrice: 12, price: 18, batchNumber: 'B123', brand: 'GSK', sku: 'AMX-001' },
-    { id: '2', pharmacyId: 'pharm-1', medicineName: 'Paracetamol', category: 'Painkiller', stock: 120, expiryDate: '2025-05-15', costPrice: 2, price: 5, batchNumber: 'B456', brand: 'Dolo', sku: 'PAR-002' },
+    { id: '1', pharmacyId: 'pharm-1', medicineName: 'Amoxicillin', brandName: 'GSK', category: 'Antibiotic', stock: 5, expiryDate: '2024-12-01', costPrice: 12, price: 18, batchNumber: 'B123', brand: 'GSK', sku: 'AMX-001' },
+    { id: '2', pharmacyId: 'pharm-1', medicineName: 'Paracetamol', brandName: 'Dolo', category: 'Painkiller', stock: 120, expiryDate: '2025-05-15', costPrice: 2, price: 5, batchNumber: 'B456', brand: 'Dolo', sku: 'PAR-002' },
   ];
 
   const filteredItems = mockInventory.filter(i => 

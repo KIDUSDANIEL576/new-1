@@ -29,6 +29,7 @@ import MarketplaceApprovals from './pages/superadmin/MarketplaceApprovals';
 import GlobalReports from './pages/superadmin/GlobalReports';
 import SystemHealth from './pages/superadmin/SystemHealth';
 import PlanControl from './pages/superadmin/PlanControl';
+import AuditTrail from './pages/superadmin/AuditTrail';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: UserRole[] }> = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -56,7 +57,7 @@ const App: React.FC = () => {
             } />
 
             <Route path="/inventory" element={
-              <ProtectedRoute allowedRoles={[UserRole.PHARMACY_ADMIN, UserRole.PHARMACIST]}>
+              <ProtectedRoute allowedRoles={[UserRole.PHARMACY_ADMIN, UserRole.PHARMACIST, UserRole.SUPER_ADMIN]}>
                 <Inventory />
               </ProtectedRoute>
             } />
@@ -80,7 +81,7 @@ const App: React.FC = () => {
             } />
 
             <Route path="/prescriptions" element={
-              <ProtectedRoute allowedRoles={[UserRole.DOCTOR, UserRole.PHARMACIST, UserRole.PHARMACY_ADMIN]}>
+              <ProtectedRoute allowedRoles={[UserRole.DOCTOR, UserRole.PHARMACIST, UserRole.PHARMACY_ADMIN, UserRole.SUPER_ADMIN]}>
                 <PrescriptionSystem />
               </ProtectedRoute>
             } />
@@ -98,13 +99,13 @@ const App: React.FC = () => {
             } />
 
             <Route path="/marketplace" element={
-              <ProtectedRoute allowedRoles={[UserRole.PHARMACY_ADMIN, UserRole.SUPER_ADMIN]}>
+              <ProtectedRoute allowedRoles={[UserRole.PHARMACY_ADMIN, UserRole.SUPER_ADMIN, UserRole.SUPPLIER, UserRole.SALES_PERSON]}>
                 <Marketplace />
               </ProtectedRoute>
             } />
 
             <Route path="/referrals" element={
-              <ProtectedRoute allowedRoles={[UserRole.PHARMACY_ADMIN, UserRole.SUPER_ADMIN]}>
+              <ProtectedRoute allowedRoles={[UserRole.PHARMACY_ADMIN, UserRole.SUPER_ADMIN, UserRole.DOCTOR]}>
                 <Referrals />
               </ProtectedRoute>
             } />
@@ -160,6 +161,12 @@ const App: React.FC = () => {
             <Route path="/super-admin/plans" element={
               <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
                 <PlanControl />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/super-admin/audit" element={
+              <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN]}>
+                <AuditTrail />
               </ProtectedRoute>
             } />
 

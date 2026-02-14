@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { UserRole, PharmacyPlan } from '../types';
+import { UserRole, PharmacyPlan, RevenueLedger, B2BTransaction } from '../types';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   AreaChart, Area 
@@ -10,32 +10,26 @@ import {
   TrendingUp, Users, Package, ShoppingBag, 
   Calendar, CheckCircle, Clock, DollarSign, ArrowRight,
   AlertTriangle, History, Zap, Activity, Search, ShieldCheck,
-  ShoppingCart, Filter, BarChart3, CreditCard
+  ShoppingCart, Filter, BarChart3, CreditCard, Truck
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { mockApi } from '../services/mockApi';
 import { Card } from '../components/common/Card';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  const [revenueTimeRange, setRevenueTimeRange] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
-  const [ledger, setLedger] = useState<any>(null);
+  const navigate = useNavigate();
+  const [ledger, setLedger] = useState<RevenueLedger | null>(null);
+  const [myTxs, setMyTxs] = useState<B2BTransaction[]>([]);
 
   useEffect(() => {
     if (user?.role === UserRole.SUPER_ADMIN) {
       mockApi.getRevenueLedger().then(setLedger);
     }
+    if (user?.organizationId) {
+      mockApi.listMyTransactions(user.organizationId).then(setMyTxs);
+    }
   }, [user]);
-
-  const salesTrend = [
-    { name: 'Mon', sales: 1200 },
-    { name: 'Tue', sales: 1500 },
-    { name: 'Wed', sales: 1100 },
-    { name: 'Thu', sales: 1800 },
-    { name: 'Fri', sales: 1600 },
-    { name: 'Sat', sales: 2400 },
-    { name: 'Sun', sales: 2100 },
-  ];
 
   const renderSuperAdmin = () => (
     <div className="space-y-10 animate-in fade-in">
@@ -45,93 +39,47 @@ const Dashboard: React.FC = () => {
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl"><Activity size={24}/></div>
                 <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">+12.5%</span>
              </div>
-             <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aggregate MRR</p>
-                <h3 className="text-3xl font-black text-slate-900">${ledger?.totalMrr?.toLocaleString() || '0'}</h3>
-             </div>
+             <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aggregate MRR</p><h3 className="text-3xl font-black text-slate-900">${ledger?.aggregateTotal?.toLocaleString() || '0'}</h3></div>
           </Card>
           <Card className="p-8 space-y-4 hover:shadow-xl transition-all">
              <div className="flex justify-between items-center">
                 <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><Users size={24}/></div>
                 <span className="text-[10px] font-black text-slate-400 uppercase">NRR: {ledger?.nrr || 0}%</span>
              </div>
-             <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Network Nodes</p>
-                <h3 className="text-3xl font-black text-slate-900">42 Nodes</h3>
-             </div>
+             <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Network Nodes</p><h3 className="text-3xl font-black text-slate-900">{ledger?.activeNodes || 0} Nodes</h3></div>
+          </Card>
+          <Card className="p-8 space-y-4 hover:shadow-xl transition-all bg-slate-900 text-white border-none shadow-2xl">
+             <div className="flex justify-between items-center"><div className="p-3 bg-white/10 text-emerald-400 rounded-2xl"><ShieldCheck size={24}/></div></div>
+             <div><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">System Integrity</p><h3 className="text-3xl font-black">Verified</h3></div>
           </Card>
           <Card className="p-8 space-y-4 hover:shadow-xl transition-all">
-             <div className="flex justify-between items-center">
-                <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl"><AlertTriangle size={24}/></div>
-                <span className="text-[10px] font-black text-rose-600 uppercase">CHURN: {ledger?.churnRate || 0}%</span>
-             </div>
-             <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Retention</p>
-                <h3 className="text-3xl font-black text-slate-900">98.8%</h3>
-             </div>
-          </Card>
-          <Card className="p-8 space-y-4 hover:shadow-xl transition-all bg-slate-900 text-white border-none">
-             <div className="flex justify-between items-center">
-                <div className="p-3 bg-white/10 text-emerald-400 rounded-2xl"><ShieldCheck size={24}/></div>
-             </div>
-             <div>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">System Integrity</p>
-                <h3 className="text-3xl font-black">Verified</h3>
-             </div>
+             <div className="flex justify-between items-center"><div className="p-3 bg-rose-50 text-rose-600 rounded-2xl"><AlertTriangle size={24}/></div></div>
+             <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Churn Rate</p><h3 className="text-3xl font-black text-slate-900">{ledger?.churnRate || 0}%</h3></div>
           </Card>
        </div>
+    </div>
+  );
 
-       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="lg:col-span-2 p-10">
-             <div className="flex justify-between items-center mb-10">
-                <div>
-                   <h4 className="text-xl font-black text-slate-900">Revenue Ledger Trends</h4>
-                   <p className="text-xs font-medium text-slate-400 italic">Financial dynamics across entire client base.</p>
-                </div>
-                <div className="flex p-1 bg-slate-50 border border-slate-100 rounded-xl">
-                   {['weekly', 'monthly', 'yearly'].map(t => (
-                     <button key={t} onClick={() => setRevenueTimeRange(t as any)} 
-                             className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${revenueTimeRange === t ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>
-                        {t}
-                     </button>
-                   ))}
-                </div>
-             </div>
-             <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                   <AreaChart data={salesTrend}>
-                      <defs><linearGradient id="cRev" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient></defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="sales" stroke="#3b82f6" strokeWidth={3} fill="url(#cRev)" />
-                   </AreaChart>
-                </ResponsiveContainer>
-             </div>
+  const renderSupplier = () => (
+    <div className="space-y-10 animate-in fade-in">
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <Card className="p-8 space-y-4 bg-indigo-600 text-white border-none shadow-2xl relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-8 opacity-10"><Zap size={80}/></div>
+             <p className="text-[10px] font-black text-indigo-100 uppercase tracking-widest">B2B Deal Volume</p>
+             <h3 className="text-4xl font-black">{myTxs.length} Active Deals</h3>
+             <button onClick={() => navigate('/marketplace')} className="text-indigo-200 font-bold text-xs hover:underline flex items-center gap-1">Open Stealth Hub <ArrowRight size={12}/></button>
           </Card>
-
-          <Card className="p-10 space-y-8 bg-slate-50 border-slate-100">
-             <h4 className="text-lg font-black text-slate-900 uppercase tracking-widest">Revenue Attribution</h4>
-             <div className="space-y-6">
-                {[
-                  { label: 'Basic Pharmacies', value: ledger?.breakdown?.basic, color: 'bg-slate-400' },
-                  { label: 'Standard Pharmacies', value: ledger?.breakdown?.standard, color: 'bg-blue-400' },
-                  { label: 'Platinum Pharmacies', value: ledger?.breakdown?.platinum, color: 'bg-indigo-400' },
-                  { label: 'Doctor Node Subscriptions', value: ledger?.breakdown?.doctors, color: 'bg-emerald-400' },
-                  { label: 'Patient Paid Access', value: ledger?.breakdown?.patients, color: 'bg-rose-400' },
-                ].map((item, idx) => (
-                  <div key={idx} className="space-y-2">
-                     <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                        <span className="text-slate-500">{item.label}</span>
-                        <span className="text-slate-900">${item.value?.toLocaleString() || '0'}</span>
-                     </div>
-                     <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div className={`h-full ${item.color}`} style={{ width: `${((item.value || 0) / (ledger?.totalMrr || 1)) * 100}%` }}></div>
-                     </div>
-                  </div>
-                ))}
-             </div>
+          <Card className="p-8 space-y-4">
+             <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl w-fit"><History size={24}/></div>
+             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Acceptance Rate</p>
+             <h3 className="text-3xl font-black text-slate-900">84%</h3>
+             <p className="text-[10px] font-bold text-emerald-600 uppercase">Tier 1 Reliability</p>
+          </Card>
+          <Card className="p-8 space-y-4">
+             <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl w-fit"><Truck size={24}/></div>
+             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fulfillment SLA</p>
+             <h3 className="text-3xl font-black text-slate-900">2.4 Days</h3>
+             <p className="text-[10px] font-bold text-slate-400 uppercase">Avg Delivery Node</p>
           </Card>
        </div>
     </div>
@@ -141,16 +89,38 @@ const Dashboard: React.FC = () => {
     <div className="max-w-7xl mx-auto space-y-12">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">System Status: <span className="text-blue-600">Online</span></h1>
-          <p className="text-slate-500 text-lg mt-1 font-medium italic">Welcome back, {user?.name}. Here's your intelligence summary.</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Hub Node: <span className="text-blue-600">Online</span></h1>
+          <p className="text-slate-500 text-lg mt-1 font-medium italic">Authorized System Entry: {user?.name}</p>
         </div>
         <div className="px-6 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm text-sm font-bold text-slate-600 flex items-center gap-2">
            <Calendar size={18} /> {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
         </div>
       </div>
 
-      {user?.role === UserRole.SUPER_ADMIN ? renderSuperAdmin() : (
-        <div className="p-10 text-center text-slate-400 font-bold">Standard Dashboard Interface Active.</div>
+      {user?.role === UserRole.SUPER_ADMIN && renderSuperAdmin()}
+      {user?.role === UserRole.SUPPLIER && renderSupplier()}
+      {[UserRole.PHARMACY_ADMIN, UserRole.PHARMACIST, UserRole.SALES_PERSON].includes(user?.role as any) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+           <Card className="p-10 space-y-8 bg-slate-900 text-white border-none shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-10"><ShoppingCart size={80}/></div>
+              <h3 className="text-3xl font-black tracking-tight">Procurement Hub</h3>
+              <p className="text-slate-400 font-medium italic leading-relaxed">"You have {myTxs.filter(t => t.status !== 'completed').length} active shipments in the stealth layer."</p>
+              <button onClick={() => navigate('/marketplace')} className="px-8 py-4 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-500 transition-all uppercase text-[10px] tracking-widest shadow-xl">Track Fulfillment</button>
+           </Card>
+           <Card className="p-10 space-y-8">
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Inventory Health</h3>
+              <div className="space-y-4">
+                 <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Critical Shortages</span>
+                    <span className="text-2xl font-black text-rose-600">4 SKUs</span>
+                 </div>
+                 <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100 flex items-center justify-between">
+                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">AI Restock Value</span>
+                    <span className="text-2xl font-black text-blue-900">$1,240</span>
+                 </div>
+              </div>
+           </Card>
+        </div>
       )}
     </div>
   );
