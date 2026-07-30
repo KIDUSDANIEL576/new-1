@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0b10" />
 <title>trace — leave me a trace</title>
-<!-- trace-web v1.2 -->
+<!-- trace-web v1.3 -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -105,6 +105,24 @@
     position: absolute; right: 12px; top: 12px; background: rgba(22,21,28,.85); border: 1px solid var(--line);
     color: var(--muted); border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer; display: none;
   }
+
+  .sheet { position: fixed; inset: 0; background: rgba(5,5,8,.72); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  .sheet .card { background: var(--panel); border: 1px solid var(--line); border-radius: 28px;
+    padding: 14px; max-width: 420px; width: 100%; }
+  .sheet .card .cap { font-family: Caveat, cursive; font-size: 26px; text-align: center; padding: 2px 0 10px; }
+  .sheet img { width: 100%; max-height: 55vh; object-fit: contain; border-radius: 18px; background: #000; display: block; }
+  .sheet .row { display: flex; gap: 10px; margin-top: 14px; }
+  .ghost { background: transparent; border: 1px solid var(--line); color: var(--text);
+    border-radius: 16px; padding: 14px; flex: 1; font-size: 15px; cursor: pointer; }
+  .primary { background: var(--ink); border: none; color: #fff; border-radius: 16px;
+    padding: 14px; flex: 1.4; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .progresswrap { position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
+    width: min(320px, 80%); background: rgba(22,21,28,.92); border: 1px solid var(--line);
+    border-radius: 14px; padding: 10px 12px; display: none; z-index: 5; }
+  .progresswrap .label { font-size: 12.5px; color: var(--text); margin-bottom: 6px; }
+  .progresswrap .bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .progresswrap .fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--ink), var(--pink)); transition: width .15s; }
 
   .brushes { display: flex; gap: 6px; padding: 10px 2px 0; }
   .brush {
@@ -266,6 +284,10 @@ function renderCanvasUI(ctx) {
         <div class="pill" id="pill"><span class="hand">✎</span><span id="pilltext"></span></div>
         <div class="emptyhint" id="empty">draw something…<br/>it appears on ${pName}'s phone, live.</div>
         <button class="removebg" id="removebg">✕ photo</button>
+        <div class="progresswrap" id="prog">
+          <div class="label" id="proglabel">sending photo…</div>
+          <div class="bar"><div class="fill" id="progfill"></div></div>
+        </div>
       </div>
       <div class="brushes" id="brushes">
         <div class="brush sel" data-brush="marker">Marker</div>
@@ -504,31 +526,92 @@ function renderCanvasUI(ctx) {
     if (data) s.id = data.id;
   }
 
-  // ---- photo background ----
+  // ---- photo background: preview sheet → instant apply → progress upload ----
   const photoInput = document.getElementById("photoInput");
+  const prog = document.getElementById("prog");
+  const progFill = document.getElementById("progfill");
+  const progLabel = document.getElementById("proglabel");
   document.getElementById("photo").addEventListener("click", () => photoInput.click());
+
   photoInput.addEventListener("change", async () => {
     const file = photoInput.files && photoInput.files[0];
     photoInput.value = "";
     if (!file || !canvasId) return;
-    pilltext.textContent = "uploading photo…"; pill.classList.add("show");
+    let blob;
+    try { blob = await shrinkImage(file, 1600, 0.85); }
+    catch { alert("Couldn't read that image — try another one."); return; }
+    openPhotoSheet(URL.createObjectURL(blob), blob);
+  });
+
+  function openPhotoSheet(previewUrl, blob) {
+    const sheet = document.createElement("div");
+    sheet.className = "sheet";
+    sheet.innerHTML = `
+      <div class="card">
+        <div class="cap">draw on this photo?</div>
+        <img src="${previewUrl}" alt="preview" />
+        <div class="row">
+          <button class="ghost" id="ph-cancel">Cancel</button>
+          <button class="primary" id="ph-use">Use as background</button>
+        </div>
+      </div>`;
+    document.body.appendChild(sheet);
+    sheet.querySelector("#ph-cancel").onclick = () => { sheet.remove(); URL.revokeObjectURL(previewUrl); };
+    sheet.querySelector("#ph-use").onclick = () => { sheet.remove(); applyPhoto(previewUrl, blob); };
+  }
+
+  async function applyPhoto(previewUrl, blob) {
+    const prevBg = bgimg.style.display === "block" ? bgimg.src : null;
+    setBg(previewUrl); // instant — you see it before the upload even starts
+    showProgress(0);
     try {
-      const blob = await shrinkImage(file, 1600, 0.85);
       const path = `${coupleId}/${uid()}.jpg`;
-      const { error: uerr } = await supabase.storage.from("trace-photos")
-        .upload(path, blob, { contentType: "image/jpeg", cacheControl: "3600" });
-      if (uerr) throw uerr;
+      await uploadWithProgress("trace-photos", path, blob, showProgress);
       const url = supabase.storage.from("trace-photos").getPublicUrl(path).data.publicUrl;
       const { error: cerr } = await supabase.from("trace_canvases").update({ photo_url: url }).eq("id", canvasId);
       if (cerr) throw cerr;
-      setBg(url);
+      bgimg.src = url; // swap preview for the hosted copy
       if (subscribed) channel.send({ type: "broadcast", event: "canvas:bg", payload: { url } });
+      finishProgress(`on ${partnerName}'s phone ✓`);
     } catch (e) {
-      alert("Photo upload failed — try a smaller photo.");
+      hideProgress();
+      setBg(prevBg);
+      alert("Upload failed — check your connection and try again.");
     } finally {
-      pill.classList.remove("show");
+      setTimeout(() => URL.revokeObjectURL(previewUrl), 5000);
     }
-  });
+  }
+
+  async function uploadWithProgress(bucket, path, blob, onProgress) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("no session");
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`);
+      xhr.setRequestHeader("Authorization", `Bearer ${session.access_token}`);
+      xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY);
+      xhr.setRequestHeader("content-type", "image/jpeg");
+      xhr.setRequestHeader("cache-control", "3600");
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error("HTTP " + xhr.status));
+      xhr.onerror = () => reject(new Error("network"));
+      xhr.send(blob);
+    });
+  }
+
+  function showProgress(p) {
+    prog.style.display = "block";
+    progFill.style.width = p + "%";
+    progLabel.textContent = p < 100 ? `sending photo… ${p}%` : "almost there…";
+  }
+  function finishProgress(msg) {
+    progFill.style.width = "100%";
+    progLabel.textContent = msg;
+    setTimeout(() => { prog.style.display = "none"; }, 1400);
+  }
+  function hideProgress() { prog.style.display = "none"; }
   removebgBtn.addEventListener("click", async () => {
     setBg(null);
     if (canvasId) await supabase.from("trace_canvases").update({ photo_url: null }).eq("id", canvasId);
