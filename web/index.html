@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0b10" />
 <title>trace — leave me a trace</title>
+<!-- trace-web v1.1 -->
+
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -331,7 +333,9 @@ function renderCanvasUI(ctx) {
     });
 
     channel.on("broadcast", { event: "stroke:start" }, ({ payload }) => {
-      live.set(payload.strokeId, { authorId: payload.authorId, color: payload.color, width: payload.width, points: [] });
+      live.set(payload.strokeId, { authorId: payload.authorId, color: payload.color, width: payload.width,
+        points: payload.pt ? [payload.pt] : [] });
+      render();
     });
     channel.on("broadcast", { event: "stroke:points" }, ({ payload }) => {
       const s = live.get(payload.strokeId);
@@ -390,7 +394,7 @@ function renderCanvasUI(ctx) {
   }
   function queuePoint(p) {
     sendBuf.push(p);
-    if (!sendTimer) sendTimer = setTimeout(flushPoints, 50);
+    if (!sendTimer) sendTimer = setTimeout(flushPoints, 25);
   }
 
   // ---- drawing input ----
@@ -407,7 +411,7 @@ function renderCanvasUI(ctx) {
     curStrokeId = uid();
     drawingStroke = { authorId: user.id, color, width: STROKE_W, points: [norm(e)] };
     live.set(curStrokeId, drawingStroke);
-    if (subscribed) channel.send({ type: "broadcast", event: "stroke:start", payload: { strokeId: curStrokeId, authorId: user.id, color, width: STROKE_W } });
+    if (subscribed) channel.send({ type: "broadcast", event: "stroke:start", payload: { strokeId: curStrokeId, authorId: user.id, color, width: STROKE_W, pt: drawingStroke.points[0] } });
     setDrawingFlag(true);
     render();
   });
