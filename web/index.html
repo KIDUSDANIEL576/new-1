@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0c0b10" />
+<title>trace — leave me a trace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0c0b10;
+    --panel: #16151c;
+    --line: rgba(255,255,255,.08);
+    --ink: #e23343;
+    --pink: #ff7a9c;
+    --gold: #f4c66b;
+    --text: #f3f0f4;
+    --muted: #9a93a5;
+    --blue: #7ec8ff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: Inter, system-ui, -apple-system, sans-serif; overscroll-behavior: none; }
+  #app { height: 100%; }
+  .hand { font-family: Caveat, cursive; }
+
+  /* ---------- sign in ---------- */
+  .signin {
+    height: 100%; display: flex; flex-direction: column; justify-content: center;
+    padding: 28px 24px; max-width: 460px; margin: 0 auto;
+    background:
+      radial-gradient(120% 80% at 20% -10%, rgba(226,51,67,.18), transparent 60%),
+      radial-gradient(120% 80% at 100% 10%, rgba(255,122,156,.14), transparent 55%),
+      var(--bg);
+  }
+  .wordmark { font-family: Caveat, cursive; font-size: 40px; font-weight: 700; letter-spacing: .5px; }
+  .wordmark .ce { color: var(--ink); }
+  .h1 { font-family: Caveat, cursive; font-size: 58px; line-height: .98; margin: 10px 0 0; }
+  .h1 .ink { color: var(--ink); }
+  .sub { color: var(--muted); font-size: 15.5px; margin-top: 14px; max-width: 330px; line-height: 1.45; }
+  .field {
+    width: 100%; background: var(--panel); border: 1px solid var(--line); color: var(--text);
+    border-radius: 16px; padding: 15px 16px; font-size: 16px; margin-top: 12px; outline: none;
+  }
+  .field:focus { border-color: rgba(226,51,67,.55); }
+  .btn {
+    width: 100%; border: none; border-radius: 16px; padding: 15px 16px; font-size: 16px; font-weight: 600;
+    margin-top: 12px; cursor: pointer; color: #fff;
+    background: linear-gradient(180deg, #e8455400, #0000), var(--ink);
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn[disabled] { opacity: .6; }
+  .demo-row { display: flex; gap: 10px; margin-top: 18px; }
+  .demo {
+    flex: 1; background: var(--panel); border: 1px solid var(--line); color: var(--text);
+    border-radius: 16px; padding: 13px 10px; font-size: 14.5px; font-weight: 500; cursor: pointer;
+    display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
+  }
+  .demo b { font-weight: 600; }
+  .demo span { color: var(--muted); font-size: 12px; }
+  .demo:active { transform: translateY(1px); }
+  .or { color: var(--muted); font-size: 12.5px; text-align: center; margin: 16px 0 2px;
+    display: flex; align-items: center; gap: 10px; }
+  .or::before, .or::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+  .hint { color: var(--muted); font-size: 12.5px; margin-top: 14px; text-align: center; }
+  .err { color: #ff9aa6; font-size: 13.5px; margin-top: 12px; min-height: 18px; text-align: center; }
+
+  /* ---------- canvas screen ---------- */
+  .stage { position: fixed; inset: 0; display: flex; flex-direction: column;
+    padding: calc(env(safe-area-inset-top) + 10px) 12px calc(env(safe-area-inset-bottom) + 12px); }
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 2px 6px 10px; }
+  .topbar .wm { font-family: Caveat, cursive; font-size: 26px; font-weight: 700; }
+  .topbar .wm .ce { color: var(--ink); }
+  .who { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4b4753; }
+  .dot.on { background: #57e08a; box-shadow: 0 0 10px rgba(87,224,138,.7); }
+
+  .board {
+    position: relative; flex: 1; border-radius: 28px; overflow: hidden;
+    border: 1px solid var(--line);
+    background:
+      radial-gradient(90% 70% at 15% 0%, rgba(226,51,67,.10), transparent 55%),
+      radial-gradient(90% 70% at 100% 100%, rgba(255,122,156,.10), transparent 55%),
+      #100f16;
+    touch-action: none;
+  }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .pill {
+    position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
+    background: rgba(22,21,28,.82); border: 1px solid var(--line); backdrop-filter: blur(8px);
+    color: var(--text); font-size: 13px; padding: 7px 14px; border-radius: 999px;
+    display: flex; align-items: center; gap: 8px; opacity: 0; transition: opacity .25s; pointer-events: none;
+  }
+  .pill.show { opacity: 1; }
+  .pill .hand { font-size: 18px; color: var(--pink); line-height: 1; }
+  .emptyhint {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-family: Caveat, cursive; font-size: 30px; text-align: center;
+    pointer-events: none; padding: 40px; transition: opacity .4s;
+  }
+
+  .toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 6px 2px; }
+  .swatches { display: flex; gap: 10px; flex: 1; }
+  .swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  .swatch.sel { border-color: #fff; transform: scale(1.06); }
+  .tool { background: var(--panel); border: 1px solid var(--line); color: var(--text);
+    border-radius: 14px; padding: 10px 14px; font-size: 14px; cursor: pointer; font-weight: 500; }
+  .tool:active { transform: translateY(1px); }
+  .center { text-align: center; }
+  .loading { height:100%; display:flex; align-items:center; justify-content:center; color: var(--muted);
+    font-family: Caveat, cursive; font-size: 30px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading">opening trace…</div></div>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+
+const SUPABASE_URL = "https://hnjjxvhutpgcdwyzmito.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhuamp4dmh1dHBnY2R3eXptaXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDY2OTgsImV4cCI6MjA5Nzk4MjY5OH0.q0pUkW15O7gdn_qxaO1upLbZJhO5-VgHqzwEKdnRh04";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true },
+});
+
+const SWATCHES = ["#e23343", "#ff7a9c", "#ffffff", "#f4c66b", "#7ec8ff"];
+const STROKE_W = 0.011;      // normalized to board width
+const app = document.getElementById("app");
+const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+// ---------------- routing ----------------
+(async function boot() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) return openCanvas();
+  renderSignIn();
+})();
+
+supabase.auth.onAuthStateChange((_e, session) => {
+  if (session && !window.__inCanvas) openCanvas();
+});
+
+// ---------------- sign in ----------------
+function renderSignIn() {
+  window.__inCanvas = false;
+  app.innerHTML = `
+    <div class="signin">
+      <div class="wordmark">tra<span class="ce">ce</span></div>
+      <h1 class="h1">Leave me<br/>a <span class="ink">trace.</span></h1>
+      <p class="sub">Whatever one of you draws appears on the other's phone — stroke by stroke, in real time.</p>
+
+      <div class="demo-row">
+        <button class="demo" data-demo="you@trace.love"><b>I'm Person A</b><span>one-tap demo</span></button>
+        <button class="demo" data-demo="partner@trace.love"><b>I'm Person B</b><span>one-tap demo</span></button>
+      </div>
+      <div class="or">or use your own</div>
+
+      <input class="field" id="email" type="email" inputmode="email" autocomplete="email"
+             placeholder="you@example.com" autocapitalize="none" />
+      <input class="field" id="password" type="password" placeholder="a password just for you two" autocomplete="current-password" />
+      <button class="btn" id="enter">Enter</button>
+      <div class="err" id="err"></div>
+      <div class="hint">New here? This creates your account. Coming back? It signs you in.<br/>
+        Tip: open Person A on one phone and Person B on another.</div>
+    </div>`;
+
+  const err = document.getElementById("err");
+  const setBusy = (b) => { document.getElementById("enter").disabled = b;
+    document.querySelectorAll(".demo").forEach(d => d.disabled = b); };
+
+  document.querySelectorAll("[data-demo]").forEach(btn =>
+    btn.addEventListener("click", () => signIn(btn.dataset.demo, "trace1234", err, setBusy, true)));
+
+  document.getElementById("enter").addEventListener("click", () => {
+    const email = document.getElementById("email").value.trim().toLowerCase();
+    const password = document.getElementById("password").value;
+    if (!email.includes("@")) return (err.textContent = "Enter your email — any email names your account.");
+    if (password.length < 6) return (err.textContent = "Pick a password of at least 6 characters.");
+    signIn(email, password, err, setBusy, false);
+  });
+  document.getElementById("password").addEventListener("keydown", e => {
+    if (e.key === "Enter") document.getElementById("enter").click();
+  });
+}
+
+async function signIn(email, password, err, setBusy, isDemo) {
+  err.textContent = ""; setBusy(true);
+  try {
+    let { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error && !isDemo) {
+      // First-timer with their own email → create the account, then they must pair (demo path skips this).
+      const up = await supabase.auth.signUp({ email, password });
+      if (up.error) { err.textContent = up.error.message; return; }
+      if (!up.data.session) { err.textContent = "Account made — sign in again to continue."; return; }
+      error = null;
+    }
+    if (error) { err.textContent = "That didn't work — check the password and try again."; return; }
+    // openCanvas fires via onAuthStateChange
+  } catch (e) {
+    err.textContent = "Network hiccup — try again.";
+  } finally { setBusy(false); }
+}
+
+// ---------------- canvas screen ----------------
+async function openCanvas() {
+  if (window.__inCanvas) return;
+  window.__inCanvas = true;
+  app.innerHTML = `<div class="loading">opening your canvas…</div>`;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) { window.__inCanvas = false; return renderSignIn(); }
+
+  // membership + canvas + partner
+  const { data: me } = await supabase.from("trace_members")
+    .select("couple_id, display_name").eq("user_id", user.id).maybeSingle();
+
+  if (!me) {
+    app.innerHTML = `<div class="signin"><div class="wordmark">tra<span class="ce">ce</span></div>
+      <p class="sub">This account isn't paired with a partner yet. Use the one-tap demo logins on the start screen to try Trace with a partner.</p>
+      <button class="btn" id="back">Back</button></div>`;
+    document.getElementById("back").onclick = async () => { await supabase.auth.signOut(); window.__inCanvas=false; renderSignIn(); };
+    return;
+  }
+
+  const coupleId = me.couple_id;
+  const myName = me.display_name || "You";
+  const { data: canvasRow } = await supabase.from("trace_canvases")
+    .select("id").eq("couple_id", coupleId).eq("kind", "shared").limit(1).maybeSingle();
+  const canvasId = canvasRow?.id;
+  const { data: partnerRow } = await supabase.from("trace_members")
+    .select("display_name").eq("couple_id", coupleId).neq("user_id", user.id).maybeSingle();
+  const partnerName = partnerRow?.display_name || "Your person";
+
+  renderCanvasUI({ user, coupleId, canvasId, myName, partnerName });
+}
+
+function renderCanvasUI(ctx) {
+  const { user, coupleId, canvasId, myName, partnerName } = ctx;
+  app.innerHTML = `
+    <div class="stage">
+      <div class="topbar">
+        <div class="wm">tra<span class="ce">ce</span></div>
+        <div class="who"><span class="dot" id="pdot"></span><span id="pwho">${escapeHtml(partnerName)}</span>
+          <span class="tool" id="signout" style="padding:6px 10px;font-size:12px;margin-left:6px">Sign out</span></div>
+      </div>
+      <div class="board" id="board">
+        <canvas id="cv"></canvas>
+        <div class="pill" id="pill"><span class="hand">✎</span><span id="pilltext"></span></div>
+        <div class="emptyhint" id="empty">draw something…<br/>it appears on ${escapeHtml(partnerName)}'s phone, live.</div>
+      </div>
+      <div class="toolbar">
+        <div class="swatches" id="swatches"></div>
+        <button class="tool" id="undo">Undo</button>
+        <button class="tool" id="clear">Clear</button>
+      </div>
+    </div>`;
+
+  // ---- state ----
+  const board = document.getElementById("board");
+  const cv = document.getElementById("cv");
+  const g = cv.getContext("2d");
+  const pill = document.getElementById("pill");
+  const pilltext = document.getElementById("pilltext");
+  const empty = document.getElementById("empty");
+  let color = SWATCHES[0];
+  let W = 0, H = 0, dpr = 1;
+
+  const strokes = [];              // committed: {id?, authorId, color, width, points:[[x,y]..]}
+  const live = new Map();          // strokeId -> stroke (in-flight, mine or partner's)
+  let myStrokeIds = [];            // for undo-own
+
+  // swatches
+  const sw = document.getElementById("swatches");
+  SWATCHES.forEach((c, i) => {
+    const el = document.createElement("div");
+    el.className = "swatch" + (i === 0 ? " sel" : "");
+    el.style.background = c;
+    if (c === "#ffffff") el.style.border = "2px solid rgba(0,0,0,.25)";
+    el.addEventListener("click", () => {
+      color = c; document.querySelectorAll(".swatch").forEach(s => s.classList.remove("sel")); el.classList.add("sel");
+    });
+    sw.appendChild(el);
+  });
+
+  // ---- sizing ----
+  function resize() {
+    const r = board.getBoundingClientRect();
+    W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    render();
+  }
+  window.addEventListener("resize", resize);
+  setTimeout(resize, 0);
+
+  function drawStroke(s) {
+    const pts = s.points;
+    if (!pts.length) return;
+    g.globalAlpha = 0.85;
+    g.strokeStyle = s.color; g.lineWidth = Math.max(1.5, s.width * W);
+    g.lineCap = "round"; g.lineJoin = "round";
+    if (s.color === "#ff7a9c" || s.color === "#7ec8ff") { g.shadowColor = s.color; g.shadowBlur = s.width * W * 0.9; }
+    else g.shadowBlur = 0;
+    g.beginPath();
+    g.moveTo(pts[0][0] * W, pts[0][1] * H);
+    if (pts.length === 1) g.lineTo(pts[0][0] * W + 0.1, pts[0][1] * H + 0.1);
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0] * W, pts[i][1] * H);
+    g.stroke();
+    g.shadowBlur = 0; g.globalAlpha = 1;
+  }
+  function render() {
+    g.clearRect(0, 0, W, H);
+    for (const s of strokes) drawStroke(s);
+    for (const s of live.values()) drawStroke(s);
+    const any = strokes.length || live.size;
+    empty.style.opacity = any ? 0 : 1;
+  }
+
+  // ---- realtime ----
+  let channel = null, subscribed = false;
+  let sendBuf = [], sendTimer = null, curStrokeId = null;
+
+  async function connect() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) supabase.realtime.setAuth(session.access_token);
+    channel = supabase.channel(`trace:couple:${coupleId}`, {
+      config: { private: true, broadcast: { self: false }, presence: { key: user.id } },
+    });
+
+    channel.on("broadcast", { event: "stroke:start" }, ({ payload }) => {
+      live.set(payload.strokeId, { authorId: payload.authorId, color: payload.color, width: payload.width, points: [] });
+    });
+    channel.on("broadcast", { event: "stroke:points" }, ({ payload }) => {
+      const s = live.get(payload.strokeId);
+      if (!s) return;
+      for (const p of payload.pts) s.points.push(p);
+      render();
+    });
+    channel.on("broadcast", { event: "stroke:end" }, ({ payload }) => {
+      const s = live.get(payload.strokeId);
+      if (s) { strokes.push(s); live.delete(payload.strokeId); render(); }
+    });
+    channel.on("broadcast", { event: "canvas:clear" }, () => {
+      strokes.length = 0; live.clear(); myStrokeIds = []; render();
+    });
+    channel.on("broadcast", { event: "canvas:reload" }, async () => {
+      live.clear(); await loadHistory();
+    });
+    channel.on("presence", { event: "sync" }, () => {
+      const state = channel.presenceState();
+      let online = false, drawing = false;
+      for (const key in state) {
+        if (key === user.id) continue;
+        online = true;
+        for (const m of state[key]) if (m.drawing) drawing = true;
+      }
+      document.getElementById("pdot").classList.toggle("on", online);
+      document.getElementById("pwho").textContent = online ? partnerName : partnerName + " (offline)";
+      if (drawing) { pilltext.textContent = `${partnerName} is drawing…`; pill.classList.add("show"); }
+      else pill.classList.remove("show");
+    });
+
+    channel.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        subscribed = true;
+        await channel.track({ userId: user.id, name: myName, drawing: false });
+        await loadHistory();
+      }
+    });
+  }
+
+  async function loadHistory() {
+    if (!canvasId) return;
+    const { data } = await supabase.from("trace_strokes")
+      .select("id, author_id, color, width, points").eq("canvas_id", canvasId).order("id", { ascending: true });
+    if (data) {
+      strokes.length = 0;
+      for (const row of data) strokes.push({ id: row.id, authorId: row.author_id, color: row.color, width: row.width, points: row.points });
+      render();
+    }
+  }
+
+  function flushPoints() {
+    if (!sendBuf.length || !subscribed) { sendTimer = null; return; }
+    const pts = sendBuf; sendBuf = []; sendTimer = null;
+    channel.send({ type: "broadcast", event: "stroke:points", payload: { strokeId: curStrokeId, pts } });
+  }
+  function queuePoint(p) {
+    sendBuf.push(p);
+    if (!sendTimer) sendTimer = setTimeout(flushPoints, 50);
+  }
+
+  // ---- drawing input ----
+  let drawingStroke = null;
+  const norm = (e) => {
+    const r = board.getBoundingClientRect();
+    return [clamp((e.clientX - r.left) / r.width), clamp((e.clientY - r.top) / r.height)];
+  };
+  function setDrawingFlag(v) { if (subscribed) channel.track({ userId: user.id, name: myName, drawing: v }); }
+
+  board.addEventListener("pointerdown", (e) => {
+    if (e.button != null && e.button !== 0 && e.pointerType === "mouse") return;
+    board.setPointerCapture(e.pointerId);
+    curStrokeId = uid();
+    drawingStroke = { authorId: user.id, color, width: STROKE_W, points: [norm(e)] };
+    live.set(curStrokeId, drawingStroke);
+    if (subscribed) channel.send({ type: "broadcast", event: "stroke:start", payload: { strokeId: curStrokeId, authorId: user.id, color, width: STROKE_W } });
+    setDrawingFlag(true);
+    render();
+  });
+  board.addEventListener("pointermove", (e) => {
+    if (!drawingStroke) return;
+    // coalesced events for smoother lines
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    for (const ev of evs) { const p = norm(ev); drawingStroke.points.push(p); queuePoint(p); }
+    render();
+  });
+  function endStroke() {
+    if (!drawingStroke) return;
+    const s = drawingStroke; drawingStroke = null;
+    if (sendTimer) { clearTimeout(sendTimer); flushPoints(); }
+    if (subscribed) channel.send({ type: "broadcast", event: "stroke:end", payload: { strokeId: curStrokeId } });
+    setDrawingFlag(false);
+    live.delete(curStrokeId);
+    strokes.push(s);
+    render();
+    persist(s);
+  }
+  board.addEventListener("pointerup", endStroke);
+  board.addEventListener("pointercancel", endStroke);
+  board.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") endStroke(); });
+
+  async function persist(s) {
+    if (!canvasId) return;
+    const { data } = await supabase.from("trace_strokes")
+      .insert({ canvas_id: canvasId, author_id: user.id, brush: "marker", color: s.color, width: s.width, points: s.points })
+      .select("id").maybeSingle();
+    if (data) { s.id = data.id; myStrokeIds.push(data.id); }
+  }
+
+  // ---- buttons ----
+  document.getElementById("clear").addEventListener("click", async () => {
+    strokes.length = 0; live.clear(); myStrokeIds = []; render();
+    if (subscribed) channel.send({ type: "broadcast", event: "canvas:clear", payload: {} });
+    if (canvasId) await supabase.from("trace_strokes").delete().eq("canvas_id", canvasId);
+  });
+  document.getElementById("undo").addEventListener("click", async () => {
+    // undo my most recent committed stroke
+    for (let i = strokes.length - 1; i >= 0; i--) {
+      if (strokes[i].authorId === user.id) {
+        const [removed] = strokes.splice(i, 1); render();
+        if (removed.id) await supabase.from("trace_strokes").delete().eq("id", removed.id);
+        // keep the partner's canvas consistent
+        if (subscribed) channel.send({ type: "broadcast", event: "canvas:reload", payload: {} });
+        break;
+      }
+    }
+  });
+  document.getElementById("signout").addEventListener("click", async () => {
+    if (channel) supabase.removeChannel(channel);
+    await supabase.auth.signOut(); window.__inCanvas = false; renderSignIn();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && subscribed) loadHistory();
+  });
+
+  connect();
+}
+
+// ---------------- utils ----------------
+function clamp(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+</script>
+</body>
+</html>
