@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0b10" />
 <title>trace — leave me a trace</title>
-<!-- trace-web v3.1 — real accounts, invite-code pairing, private channel, signed photos, widget snapshots -->
+<!-- trace-web v4.0 — Trace Forever entitlements, tier gating, invisible ink, paywall -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -200,6 +200,28 @@
   .swatch.sel { border-color: #fff; transform: scale(1.06); }
   .loading { height:100%; display:flex; align-items:center; justify-content:center; color: var(--muted);
     font-family: Caveat, cursive; font-size: 30px; }
+
+  /* ---------- Trace Forever ---------- */
+  .brush { position: relative; }
+  .brush.locked { opacity: .5; }
+  .brush .lock { position: absolute; top: 4px; right: 5px; color: var(--gold); opacity: .9; }
+  .tier { display: flex; align-items: center; gap: 5px; border-radius: 999px; padding: 6px 11px;
+    font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--gold); }
+  .tier.free { color: var(--muted); font-weight: 500; }
+  .iconbtn.on { color: var(--gold); border-color: rgba(244,198,107,.55); background: rgba(244,198,107,.14); }
+  .iconbtn.hidden { display: none; }
+
+  .paywall .card { max-width: 400px; padding: 22px 20px 18px; text-align: center; }
+  .paywall .kicker { font-family: Caveat, cursive; font-size: 30px; line-height: 1.05; }
+  .paywall .kicker .ink { color: var(--ink); }
+  .paywall .price { font-size: 15px; color: var(--gold); font-weight: 600; margin-top: 8px; }
+  .paywall .price small { color: var(--muted); font-weight: 400; display: block; font-size: 12.5px; margin-top: 3px; }
+  .paywall .why { color: var(--muted); font-size: 13.5px; margin: 12px 0 4px; line-height: 1.5; }
+  .paywall ul { list-style: none; margin: 14px 0 0; padding: 0; text-align: left; }
+  .paywall li { display: flex; gap: 9px; align-items: flex-start; font-size: 14px; padding: 6px 2px; }
+  .paywall li .tick { color: var(--gold); flex: none; margin-top: 1px; }
+  .paywall .note { color: var(--muted); font-size: 12px; margin-top: 14px; line-height: 1.5;
+    border-top: 1px solid var(--line); padding-top: 12px; }
 </style>
 </head>
 <body>
@@ -218,6 +240,29 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 const SWATCHES = ["#e23343", "#ff7a9c", "#ffffff", "#f4c66b", "#7ec8ff"];
 const STROKE_W = 0.011;
+
+/* ---------- Trace Forever ----------
+   The server is the only authority on who paid (entitlements table, written
+   solely by the RevenueCat webhook). Everything here is the polite front door:
+   it keeps free users from walking into a wall, but the DB enforces the tiers
+   regardless of what this file believes. */
+const FREE_BRUSHES = new Set(["marker", "chalk"]);
+const PRICE = "$29.99 once";
+const tier = { isPro: false, photosToday: 0, photoLimit: 1, replayDays: 7 };
+
+async function refreshTier() {
+  const { data } = await supabase.rpc("my_status");
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return tier;
+  tier.isPro = !!row.is_pro;
+  tier.photosToday = row.photos_today ?? 0;
+  tier.photoLimit = row.photo_limit;   // null = unlimited
+  tier.replayDays = row.replay_days;   // null = full history
+  return tier;
+}
+const brushLocked = (b) => !tier.isPro && !FREE_BRUSHES.has(b);
+const photosLeft = () =>
+  tier.photoLimit == null ? Infinity : Math.max(0, tier.photoLimit - tier.photosToday);
 const app = document.getElementById("app");
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
@@ -240,6 +285,11 @@ const I = {
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   sliders: '<line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+  infinity: '<path d="M6 16c3.5 0 5-8 8.5-8a4 4 0 0 1 0 8C11 16 9.5 8 6 8a4 4 0 0 0 0 8"/>',
+  heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
 };
 const icon = (n, sz = 18) =>
   `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
@@ -447,6 +497,7 @@ async function openCanvas() {
   }
   const partnerName = partnerRow?.display_name || "your person";
 
+  await refreshTier();
   renderCanvasUI({ user, coupleId, canvasId, myName, partnerName, photoUrl });
 }
 
@@ -458,6 +509,7 @@ function renderCanvasUI(ctx) {
       <div class="topbar">
         <div class="wm">tra<span class="ce">ce</span></div>
         <div class="streak glass zero" id="streak">${icon("flame", 15)}<span id="streakn">0</span></div>
+        <div class="tier glass" id="tierpill"></div>
         <div class="who glass"><span class="dot" id="pdot"></span><span id="pwho">${pName}</span></div>
         <div class="iconbtn" id="signout" title="Sign out">${icon("logout", 16)}</div>
       </div>
@@ -497,12 +549,14 @@ function renderCanvasUI(ctx) {
       </div>
       <div class="brushes">
         <div class="brush glass sel" data-brush="marker">${icon("pen", 17)}Marker</div>
+        <div class="brush glass" data-brush="chalk">${icon("highlighter", 17)}Chalk</div>
         <div class="brush glass" data-brush="glow">${icon("sparkles", 17)}Glow</div>
         <div class="brush glass" data-brush="neon">${icon("zap", 17)}Neon</div>
-        <div class="brush glass" data-brush="chalk">${icon("highlighter", 17)}Chalk</div>
+        <div class="brush glass" data-brush="invisible">${icon("eye", 17)}Secret</div>
       </div>
       <div class="toolbar">
         <div class="swatches" id="swatches"></div>
+        <div class="iconbtn hidden" id="reveal" title="Hold to reveal invisible ink">${icon("eye", 17)}</div>
         <div class="iconbtn" id="photo" title="Photo background">${icon("image", 17)}</div>
         <div class="iconbtn" id="replaybtn" title="Replay your story">${icon("history", 17)}</div>
         <div class="iconbtn" id="undo" title="Undo my last stroke">${icon("undo", 17)}</div>
@@ -526,6 +580,7 @@ function renderCanvasUI(ctx) {
   let view = "all";
   let W = 0, H = 0, dpr = 1;
   let bgState = null; // { url, fit, dim }
+  let revealing = false; // invisible ink is only drawn while the eye is held
 
   const strokes = [];
   const live = new Map();
@@ -578,10 +633,16 @@ function renderCanvasUI(ctx) {
 
   async function persistBg(broadcast = true) {
     const val = bgString();
-    if (canvasId) await supabase.from("canvases").update({ photo_url: val }).eq("id", canvasId);
+    if (canvasId) {
+      const { error } = await supabase.from("canvases").update({ photo_url: val }).eq("id", canvasId);
+      // the daily photo limit is enforced by the DB, so this is the real answer
+      if (error) return error;
+    }
     if (broadcast && subscribed) channel.send({ type: "broadcast", event: "canvas:bg", payload: { url: val } });
     queueSnapshot();
+    return null;
   }
+  const isPhotoLimit = (e) => /FREE_PHOTO_LIMIT/.test(e?.message ?? "");
   document.getElementById("bgopts").addEventListener("click", () => {
     bgpanel.style.display = bgpanel.style.display === "block" ? "none" : "block";
   });
@@ -616,12 +677,67 @@ function renderCanvasUI(ctx) {
   const visible = (s) =>
     view === "all" ? true : view === "mine" ? s.authorId === user.id : s.authorId !== user.id;
 
+  /* ---------- tier surface ---------- */
+  const tierPill = document.getElementById("tierpill");
+  const revealBtn = document.getElementById("reveal");
+
+  function syncTierUI() {
+    tierPill.className = "tier glass" + (tier.isPro ? "" : " free");
+    tierPill.innerHTML = tier.isPro
+      ? `${icon("heart", 13)}<span>Forever</span>`
+      : `${icon("lock", 13)}<span>Unlock</span>`;
+    tierPill.title = tier.isPro
+      ? "Trace Forever — every brush, unlimited photos, your whole story"
+      : `Trace Forever — ${PRICE}, unlocks both of you`;
+
+    document.querySelectorAll(".brush").forEach(b => {
+      const locked = brushLocked(b.dataset.brush);
+      b.classList.toggle("locked", locked);
+      let badge = b.querySelector(".lock");
+      if (locked && !badge) b.insertAdjacentHTML("beforeend", `<span class="lock">${icon("lock", 10)}</span>`);
+      if (!locked && badge) badge.remove();
+    });
+
+    // the reveal button only matters once there's something hidden to reveal
+    revealBtn.classList.toggle("hidden", !strokes.some(s => s.brush === "invisible"));
+  }
+  tierPill.addEventListener("click", () => openPaywall("info", () => { syncTierUI(); render(); }));
+
   /* ---------- brushes & colors ---------- */
+  function selectBrush(name) {
+    brush = name;
+    document.querySelectorAll(".brush").forEach(x =>
+      x.classList.toggle("sel", x.dataset.brush === name));
+  }
   document.querySelectorAll(".brush").forEach(b => b.addEventListener("click", () => {
-    brush = b.dataset.brush;
-    document.querySelectorAll(".brush").forEach(x => x.classList.remove("sel"));
-    b.classList.add("sel");
+    const want = b.dataset.brush;
+    if (brushLocked(want)) {
+      openPaywall("brush", () => { syncTierUI(); selectBrush(want); });
+      return;
+    }
+    selectBrush(want);
   }));
+
+  /* ---------- invisible ink: hold the eye to reveal ---------- */
+  let revealTimer = null;
+  const startReveal = () => {
+    revealing = true;
+    revealBtn.classList.add("on");
+    render();
+    clearTimeout(revealTimer);
+    revealTimer = setTimeout(endReveal, 6000); // never leave secrets on screen
+  };
+  const endReveal = () => {
+    if (!revealing) return;
+    revealing = false;
+    revealBtn.classList.remove("on");
+    clearTimeout(revealTimer);
+    render();
+  };
+  revealBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); startReveal(); });
+  revealBtn.addEventListener("pointerup", endReveal);
+  revealBtn.addEventListener("pointercancel", endReveal);
+  revealBtn.addEventListener("pointerleave", endReveal);
   const sw = document.getElementById("swatches");
   SWATCHES.forEach((c, i) => {
     const el = document.createElement("div");
@@ -645,12 +761,21 @@ function renderCanvasUI(ctx) {
   window.addEventListener("resize", resize);
   setTimeout(resize, 0);
 
-  function drawStroke(s) {
+  function drawStroke(s, forceReveal = false) {
     const pts = s.points;
     if (!pts.length) return;
     const w = Math.max(1.5, s.width * W);
     const b = s.brush || "marker";
-    if (b === "glow") { g.globalAlpha = 0.9; g.shadowColor = s.color; g.shadowBlur = w * 1.6; g.lineWidth = w; }
+    if (b === "invisible") {
+      // held: a warm shimmer. released: barely a smudge on the glass, so you
+      // know something is there without being able to read it.
+      if (revealing || forceReveal) { g.globalAlpha = 0.88; g.shadowColor = s.color; g.shadowBlur = w * 1.2; g.lineWidth = w; }
+      // Not revealed: blurred past legibility. A low-alpha copy of the real
+      // stroke would still be readable — the whole point is that they can see
+      // something is waiting without being able to read it yet.
+      else { g.globalAlpha = 0.20; g.shadowBlur = 0; g.lineWidth = w * 1.1; g.filter = `blur(${Math.max(5, w * 0.9)}px)`; }
+    }
+    else if (b === "glow") { g.globalAlpha = 0.9; g.shadowColor = s.color; g.shadowBlur = w * 1.6; g.lineWidth = w; }
     else if (b === "neon") { g.globalAlpha = 1; g.shadowColor = s.color; g.shadowBlur = w * 2.6; g.lineWidth = w * 0.75; }
     else if (b === "chalk") { g.globalAlpha = 0.45; g.shadowBlur = 0; g.lineWidth = w * 1.15; }
     else { g.globalAlpha = 0.85; g.shadowBlur = 0; g.lineWidth = w; }
@@ -664,14 +789,17 @@ function renderCanvasUI(ctx) {
       g.shadowBlur = 0; g.globalAlpha = 0.9; g.strokeStyle = "#ffffff"; g.lineWidth = Math.max(1, w * 0.22);
       g.stroke();
     }
-    g.shadowBlur = 0; g.globalAlpha = 1;
+    g.shadowBlur = 0; g.globalAlpha = 1; g.filter = "none";
   }
   function render() {
     if (replay.active) { renderReplay(); return; }
     g.clearRect(0, 0, W, H);
     let shown = 0;
     for (const s of strokes) if (visible(s)) { drawStroke(s); shown++; }
-    for (const s of live.values()) if (visible(s)) { drawStroke(s); shown++; }
+    // your own in-progress stroke always renders — you can't write with ink you
+    // can't see. It fades to a smudge the moment you lift, and your partner
+    // never sees it appear at all.
+    for (const s of live.values()) if (visible(s)) { drawStroke(s, s === drawingStroke); shown++; }
     empty.style.opacity = shown ? 0 : 1;
   }
 
@@ -689,7 +817,26 @@ function renderCanvasUI(ctx) {
       pill.classList.add("show"); setTimeout(() => pill.classList.remove("show"), 2200);
       return;
     }
-    replay.snap = strokes.slice();
+    // Invisible ink stays out of the replay — same reason it stays off the
+    // widget. Free couples replay the last `replayDays`; Pro replays it all.
+    let snap = strokes.filter(s => s.brush !== "invisible");
+    let trimmed = 0;
+    if (tier.replayDays != null) {
+      const cutoff = Date.now() - tier.replayDays * 86400000;
+      const before = snap.length;
+      // strokes drawn this session have no createdAt yet — they're always recent
+      snap = snap.filter(s => !s.createdAt || Date.parse(s.createdAt) >= cutoff);
+      trimmed = before - snap.length;
+    }
+    if (!snap.length) {
+      openPaywall("replay", () => { syncTierUI(); document.getElementById("replaybtn").click(); });
+      return;
+    }
+    if (trimmed) {
+      pilltext.textContent = `showing the last ${tier.replayDays} days — ${trimmed} older stroke${trimmed > 1 ? "s" : ""} need Forever`;
+      pill.classList.add("show"); setTimeout(() => pill.classList.remove("show"), 3200);
+    }
+    replay.snap = snap;
     replay.total = replay.snap.reduce((n, s) => n + s.points.length, 0);
     replay.idx = 0; replay.active = true;
     rslider.max = replay.total; rslider.value = 0;
@@ -801,10 +948,10 @@ function renderCanvasUI(ctx) {
     });
     channel.on("broadcast", { event: "stroke:end" }, ({ payload }) => {
       const s = live.get(payload.strokeId);
-      if (s) { strokes.push(s); live.delete(payload.strokeId); render(); refreshStreak(); }
+      if (s) { strokes.push(s); live.delete(payload.strokeId); render(); syncTierUI(); refreshStreak(); }
     });
     channel.on("broadcast", { event: "canvas:clear" }, () => {
-      strokes.length = 0; live.clear(); render();
+      strokes.length = 0; live.clear(); render(); syncTierUI();
     });
     channel.on("broadcast", { event: "canvas:reload" }, async () => {
       live.clear(); await loadHistory();
@@ -839,12 +986,14 @@ function renderCanvasUI(ctx) {
   async function loadHistory() {
     if (!canvasId) return;
     const { data } = await supabase.from("strokes")
-      .select("id, author_id, brush, color, width, points").eq("canvas_id", canvasId).order("id", { ascending: true });
+      .select("id, author_id, brush, color, width, points, created_at")
+      .eq("canvas_id", canvasId).order("id", { ascending: true });
     if (data) {
       strokes.length = 0;
       for (const row of data) strokes.push({ id: row.id, authorId: row.author_id, brush: row.brush,
-        color: row.color, width: row.width, points: row.points });
+        color: row.color, width: row.width, points: row.points, createdAt: row.created_at });
       render();
+      syncTierUI();
     }
   }
 
@@ -895,6 +1044,7 @@ function renderCanvasUI(ctx) {
     live.delete(curStrokeId);
     strokes.push(s);
     render();
+    syncTierUI();
     persist(s);
     markToday();
     queueSnapshot();
@@ -905,10 +1055,22 @@ function renderCanvasUI(ctx) {
 
   async function persist(s) {
     if (!canvasId) return;
-    const { data } = await supabase.from("strokes")
+    const { data, error } = await supabase.from("strokes")
       .insert({ canvas_id: canvasId, author_id: user.id, brush: s.brush, color: s.color, width: s.width, points: s.points })
       .select("id").maybeSingle();
-    if (data) s.id = data.id;
+    if (data) { s.id = data.id; return; }
+    // The DB owns the tiers. If this client's idea of the tier was stale (an
+    // old cached page, or an entitlement that lapsed), the insert is rejected
+    // here — take the stroke back off the canvas rather than showing the user
+    // something their partner will never receive.
+    if (error && /PRO_BRUSH/.test(error.message ?? "")) {
+      const i = strokes.indexOf(s);
+      if (i >= 0) strokes.splice(i, 1);
+      if (subscribed) channel.send({ type: "broadcast", event: "canvas:reload", payload: {} });
+      render();
+      selectBrush("marker");
+      openPaywall("brush", () => { syncTierUI(); render(); });
+    }
   }
 
   /* ---------- photo import: preview → instant apply → progress upload ---------- */
@@ -916,7 +1078,13 @@ function renderCanvasUI(ctx) {
   const prog = document.getElementById("prog");
   const progFill = document.getElementById("progfill");
   const progLabel = document.getElementById("proglabel");
-  document.getElementById("photo").addEventListener("click", () => photoInput.click());
+  document.getElementById("photo").addEventListener("click", () => {
+    if (!photosLeft()) {
+      openPaywall("photo", () => { syncTierUI(); photoInput.click(); });
+      return;
+    }
+    photoInput.click();
+  });
 
   photoInput.addEventListener("change", async () => {
     const file = photoInput.files && photoInput.files[0];
@@ -953,7 +1121,19 @@ function renderCanvasUI(ctx) {
       const path = `${coupleId}/${uid()}.jpg`;
       await uploadWithProgress("couple-photos", path, blob, showProgress);
       bgState.url = path; // persist the private storage path; partner resolves a signed URL
-      await persistBg();
+      const err = await persistBg();
+      if (err) {
+        hideProgress();
+        setBg(prevBg);
+        if (isPhotoLimit(err)) {
+          tier.photosToday = Math.max(tier.photosToday, 1);
+          openPaywall("photo");
+        } else {
+          alert("Couldn't set that photo — try again.");
+        }
+        return;
+      }
+      tier.photosToday++;
       finishProgress(`on ${partnerName}'s phone ✓`);
     } catch (e) {
       hideProgress();
@@ -1011,7 +1191,7 @@ function renderCanvasUI(ctx) {
 
   /* ---------- toolbar actions ---------- */
   document.getElementById("clear").addEventListener("click", async () => {
-    strokes.length = 0; live.clear(); render();
+    strokes.length = 0; live.clear(); render(); syncTierUI();
     if (subscribed) channel.send({ type: "broadcast", event: "canvas:clear", payload: {} });
     if (canvasId) await supabase.from("strokes").delete().eq("canvas_id", canvasId);
     queueSnapshot();
@@ -1019,7 +1199,7 @@ function renderCanvasUI(ctx) {
   document.getElementById("undo").addEventListener("click", async () => {
     for (let i = strokes.length - 1; i >= 0; i--) {
       if (strokes[i].authorId === user.id) {
-        const [removed] = strokes.splice(i, 1); render();
+        const [removed] = strokes.splice(i, 1); render(); syncTierUI();
         if (removed.id) await supabase.from("strokes").delete().eq("id", removed.id);
         if (subscribed) channel.send({ type: "broadcast", event: "canvas:reload", payload: {} });
         queueSnapshot();
@@ -1032,11 +1212,65 @@ function renderCanvasUI(ctx) {
     await supabase.auth.signOut(); window.__inCanvas = false; renderSignIn();
   });
 
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && subscribed) { loadHistory(); refreshStreak(); }
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === "visible" && subscribed) {
+      // coming back is also when a purchase made on the phone should land here
+      await refreshTier();
+      syncTierUI();
+      loadHistory();
+      refreshStreak();
+    }
   });
 
+  syncTierUI();
   connect();
+}
+
+/* ---------- the paywall ----------
+   Purchases run through RevenueCat in the iOS/Android app; there is no card
+   form on the web. Because the entitlement is stored per couple on the server,
+   buying on either phone unlocks this page too — so the web CTA is "check
+   again", not a fake buy button. */
+const PAYWALL_REASONS = {
+  brush: "That brush is part of Trace Forever.",
+  photo: "You've used today's free photo. Trace Forever lifts the limit.",
+  replay: "Free replay goes back 7 days. Trace Forever replays everything.",
+  info: "One payment. Both of you. Forever.",
+};
+
+function openPaywall(reason = "info", onUnlock) {
+  if (document.querySelector(".paywall")) return;
+  const sheet = document.createElement("div");
+  sheet.className = "sheet paywall";
+  const li = (ic, text) => `<li><span class="tick">${icon(ic, 16)}</span><span>${text}</span></li>`;
+  sheet.innerHTML = `
+    <div class="card glass">
+      <div class="kicker">trace <span class="ink">forever</span></div>
+      <div class="price">${PRICE}<small>one purchase unlocks both of you</small></div>
+      <div class="why">${escapeHtml(PAYWALL_REASONS[reason] ?? PAYWALL_REASONS.info)}</div>
+      <ul>
+        ${li("sparkles", "Every brush — glow, neon, and invisible ink")}
+        ${li("infinity", "Unlimited photos, not one a day")}
+        ${li("history", "Your whole story in Replay, back to day one")}
+        ${li("heart", "Unlocks for your person at the same moment")}
+      </ul>
+      <div class="row">
+        <button class="ghost" id="pw-close">Not now</button>
+        <button class="primary" id="pw-check">I've already paid</button>
+      </div>
+      <div class="note">Trace Forever is bought once in the iOS or Android app.
+        It unlocks this page automatically — nothing to enter here.</div>
+    </div>`;
+  document.body.appendChild(sheet);
+  sheet.querySelector("#pw-close").onclick = () => sheet.remove();
+  sheet.querySelector("#pw-check").onclick = async () => {
+    const btn = sheet.querySelector("#pw-check");
+    btn.disabled = true; btn.textContent = "checking…";
+    await refreshTier();
+    sheet.remove();
+    if (tier.isPro) onUnlock?.();
+    else openPaywall("info", onUnlock);
+  };
 }
 
 function clamp(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }

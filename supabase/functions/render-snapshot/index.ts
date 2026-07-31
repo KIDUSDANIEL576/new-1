@@ -68,10 +68,14 @@ Deno.serve(async (req) => {
       canvases.find((c) => c.kind === 'shared') ??
       canvases[0];
 
+    // Invisible ink is deliberately excluded: a secret that shows up on the
+    // home screen isn't a secret. It only ever renders inside the app, on
+    // hold-to-reveal.
     const { data: strokes } = await admin
       .from('strokes')
       .select('brush, color, width, points')
       .eq('canvas_id', target.id)
+      .neq('brush', 'invisible')
       .order('id', { ascending: true });
 
     const canvas = createCanvas(W, H);

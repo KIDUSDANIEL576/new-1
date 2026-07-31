@@ -21,6 +21,8 @@ interface Props {
   onBegin: (brush: Brush, color: string, width: number) => string;
   onPoint: (strokeId: string, pt: Point) => void;
   onEnd: (strokeId: string) => void;
+  /** While true, invisible ink renders legibly. */
+  revealing?: boolean;
 }
 
 const MIN_SEGMENT_PX = 1.5; // same point-thinning as the prototype
@@ -38,6 +40,7 @@ export function CanvasBoard({
   onBegin,
   onPoint,
   onEnd,
+  revealing = false,
 }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const activeIdRef = useRef<string | null>(null);
@@ -107,10 +110,19 @@ export function CanvasBoard({
               />
             </Rect>
             {strokes.map((s) => (
-              <StrokeRenderer key={s.id} stroke={s} width={w} height={h} />
+              <StrokeRenderer key={s.id} stroke={s} width={w} height={h} revealed={revealing} />
             ))}
+            {/* your own in-progress stroke always shows — you can't write with
+                ink you can't see. It fades the moment you lift, and your
+                partner never sees it appear at all. */}
             {Object.values(liveStrokes).map((s) => (
-              <StrokeRenderer key={s.id} stroke={s} width={w} height={h} />
+              <StrokeRenderer
+                key={s.id}
+                stroke={s}
+                width={w}
+                height={h}
+                revealed={revealing || s.id === activeIdRef.current}
+              />
             ))}
           </Canvas>
         )}

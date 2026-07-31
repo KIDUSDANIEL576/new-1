@@ -7,10 +7,17 @@ interface Props {
   stroke: Stroke;
   width: number; // canvas px width
   height: number; // canvas px height
+  /** Invisible ink renders legibly only while the reader holds the eye. */
+  revealed?: boolean;
 }
 
 /** Renders one stroke with its brush character (matches the prototype's canvas brushes). */
-export const StrokeRenderer = React.memo(function StrokeRenderer({ stroke, width, height }: Props) {
+export const StrokeRenderer = React.memo(function StrokeRenderer({
+  stroke,
+  width,
+  height,
+  revealed = false,
+}: Props) {
   const path = useMemo(
     () => buildSmoothPath(stroke.points, width, height),
     // points array is append-only, so length is a sufficient dependency
@@ -58,5 +65,18 @@ export const StrokeRenderer = React.memo(function StrokeRenderer({ stroke, width
       );
     case 'chalk':
       return <Path {...common} color={stroke.color} strokeWidth={w} opacity={0.55} />;
+    case 'invisible':
+      // Held: a warm shimmer. Otherwise blurred past legibility — a low-opacity
+      // copy would still be readable, and the whole point is that they can see
+      // something is waiting without being able to read it yet.
+      return revealed ? (
+        <Path {...common} color={stroke.color} strokeWidth={w} opacity={0.88}>
+          <BlurMask blur={4} style="normal" />
+        </Path>
+      ) : (
+        <Path {...common} color={stroke.color} strokeWidth={w * 1.1} opacity={0.2}>
+          <BlurMask blur={9} style="normal" />
+        </Path>
+      );
   }
 });

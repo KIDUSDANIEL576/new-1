@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { coupleChannel, TABLES } from '@/lib/backend';
+import { isTierError } from '@/lib/entitlements';
 import { supabase } from '@/lib/supabase';
 import { notifyPartner } from '@/lib/notifications';
 import { renderSnapshot } from '@/lib/widget';
@@ -29,6 +30,12 @@ interface Args {
   canvasId: string;
   userId: string;
   displayName: string;
+  /**
+   * The DB owns the tiers. If it rejects a stroke (this build's idea of the
+   * couple's entitlement was stale), the stroke is taken back off the canvas
+   * and this fires — rather than showing ink the partner will never receive.
+   */
+  onTierRejected?: () => void;
 }
 
 /**
@@ -41,7 +48,13 @@ interface Args {
  * - persistence on stroke end, daily mark, throttled partner push
  * - undo-own-stroke and clear, mirrored to the partner via broadcast
  */
-export function useSharedCanvas({ coupleId, canvasId, userId, displayName }: Args) {
+export function useSharedCanvas({
+  coupleId,
+  canvasId,
+  userId,
+  displayName,
+  onTierRejected,
+}: Args) {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [liveStrokes, setLiveStrokes] = useState<Record<string, Stroke>>({});
   const [partnerDrawing, setPartnerDrawing] = useState<string | null>(null);
@@ -268,8 +281,9 @@ export function useSharedCanvas({ coupleId, canvasId, userId, displayName }: Arg
 
       // persist, then broadcast end with the row id so both sides can undo it later
       let dbId: number | null = null;
+      let tierRejected = false;
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from(TABLES.strokes)
           .insert({
             canvas_id: canvasId,
@@ -282,15 +296,25 @@ export function useSharedCanvas({ coupleId, canvasId, userId, displayName }: Arg
           .select('id')
           .single();
         dbId = data?.id ?? null;
+        tierRejected = isTierError(error?.message);
       } catch {
         // keep the stroke locally even if persistence failed
       }
-      send('stroke:end', { strokeId, dbId } satisfies StrokeEndPayload);
 
       setLiveStrokes((prev) => {
         const { [strokeId]: _done, ...rest } = prev;
         return rest;
       });
+
+      if (tierRejected) {
+        // drop it rather than leaving ink that will never sync
+        send('stroke:end', { strokeId, dbId: null } satisfies StrokeEndPayload);
+        send('canvas:reload', {});
+        onTierRejected?.();
+        return;
+      }
+
+      send('stroke:end', { strokeId, dbId } satisfies StrokeEndPayload);
       setStrokes((list) => [...list, { ...finished!, dbId: dbId ?? undefined }]);
 
       // streak mark + throttled partner push (both best-effort)
@@ -305,7 +329,7 @@ export function useSharedCanvas({ coupleId, canvasId, userId, displayName }: Arg
       notifyPartner(coupleId);
       renderSnapshot(coupleId);
     },
-    [canvasId, coupleId, send, trackPresence, userId]
+    [canvasId, coupleId, send, trackPresence, userId, onTierRejected]
   );
 
   // ---- undo own last stroke ----

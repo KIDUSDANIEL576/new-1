@@ -1,4 +1,4 @@
-export type Brush = 'marker' | 'glow' | 'neon' | 'chalk';
+export type Brush = 'marker' | 'glow' | 'neon' | 'chalk' | 'invisible';
 
 // Points are normalized 0..1 so canvases render identically across screen sizes.
 export type Point = [number, number];

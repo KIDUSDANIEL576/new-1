@@ -1,8 +1,9 @@
 import { Redirect, router } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CanvasBoard } from '@/components/CanvasBoard';
+import { Paywall, type PaywallReason } from '@/components/Paywall';
 import { PresencePill } from '@/components/PresencePill';
 import { useToast } from '@/components/Toast';
 import { Toolbar } from '@/components/Toolbar';
@@ -11,6 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCouple } from '@/hooks/useCouple';
 import { useSharedCanvas } from '@/hooks/useSharedCanvas';
 import { BRUSHES } from '@/lib/brushes';
+import { useEntitlement } from '@/lib/entitlements';
+import { configureIap } from '@/lib/iap';
 import { registerPushToken } from '@/lib/notifications';
 import { publishWidgetUrl } from '@/lib/widget';
 import { supabase } from '@/lib/supabase';
@@ -59,6 +62,9 @@ function SharedCanvas({
   const toast = useToast();
   const [brush, setBrush] = useState<Brush>('marker');
   const [color, setColor] = useState<string>(swatches[0]);
+  const { status, refresh: refreshTier } = useEntitlement();
+  const [paywall, setPaywall] = useState<PaywallReason | null>(null);
+  const [revealing, setRevealing] = useState(false);
 
   const {
     strokes,
@@ -72,12 +78,39 @@ function SharedCanvas({
     undoLast,
     clearCanvas,
     canUndo,
-  } = useSharedCanvas({ coupleId, canvasId, userId, displayName });
+  } = useSharedCanvas({
+    coupleId,
+    canvasId,
+    userId,
+    displayName,
+    onTierRejected: useCallback(() => {
+      void refreshTier();
+      setBrush('marker');
+      setPaywall('brush');
+    }, [refreshTier]),
+  });
 
   useEffect(() => {
     registerPushToken(userId);
     publishWidgetUrl(userId);
+    // the Supabase user id IS the RevenueCat app user id — that's how the
+    // webhook maps a purchase back to this couple
+    void configureIap(userId);
   }, [userId]);
+
+  // a locked brush can only be selected once the couple is actually Pro
+  useEffect(() => {
+    if (!status.isPro && brush !== 'marker' && brush !== 'chalk') setBrush('marker');
+  }, [status.isPro, brush]);
+
+  // never leave a secret on screen
+  useEffect(() => {
+    if (!revealing) return;
+    const t = setTimeout(() => setRevealing(false), 6000);
+    return () => clearTimeout(t);
+  }, [revealing]);
+
+  const hasSecrets = strokes.some((s) => s.brush === 'invisible');
 
   // the moment the partner first shows up, celebrate + load their name
   const partnerSeenRef = useRef(false);
@@ -121,6 +154,11 @@ function SharedCanvas({
         <Pressable onLongPress={onWordmarkLongPress}>
           <Wordmark />
         </Pressable>
+        {!status.isPro && (
+          <Pressable style={styles.tierChip} onPress={() => setPaywall('info')}>
+            <Text style={styles.tierChipText}>unlock</Text>
+          </Pressable>
+        )}
         {partnerDrawing ? (
           <PresencePill name={partnerDrawing} />
         ) : partnerName || partnerOnline ? (
@@ -157,9 +195,17 @@ function SharedCanvas({
         onBegin={beginStroke}
         onPoint={addPoint}
         onEnd={endStroke}
+        revealing={revealing}
       />
 
-      <Toolbar brush={brush} color={color} onBrush={setBrush} onColor={setColor} />
+      <Toolbar
+        brush={brush}
+        color={color}
+        isPro={status.isPro}
+        onBrush={setBrush}
+        onColor={setColor}
+        onLocked={() => setPaywall('brush')}
+      />
 
       <View style={styles.actions}>
         <View style={{ flex: 1 }}>
@@ -168,7 +214,25 @@ function SharedCanvas({
         <View style={{ flex: 1 }}>
           <Button title="↺ Undo" variant="ghost" onPress={undoLast} disabled={!canUndo} />
         </View>
+        {hasSecrets && (
+          <Pressable
+            onPressIn={() => setRevealing(true)}
+            onPressOut={() => setRevealing(false)}
+            style={[styles.reveal, revealing && styles.revealOn]}
+          >
+            <Text style={[styles.revealText, revealing && { color: colors.gold }]}>
+              {revealing ? 'reading…' : 'hold to read'}
+            </Text>
+          </Pressable>
+        )}
       </View>
+
+      <Paywall
+        visible={paywall !== null}
+        reason={paywall ?? 'info'}
+        onClose={() => setPaywall(null)}
+        onUnlocked={refreshTier}
+      />
     </Screen>
   );
 }
@@ -201,4 +265,22 @@ const styles = StyleSheet.create({
   },
   connText: { color: '#ffb9c2', fontSize: 12, fontWeight: '500' },
   actions: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  tierChip: {
+    borderWidth: 1,
+    borderColor: 'rgba(244,198,107,0.45)',
+    borderRadius: radius.pill,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  tierChipText: { color: colors.gold, fontSize: 12, fontWeight: '600' },
+  reveal: {
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panel2,
+    borderRadius: radius.button,
+    paddingHorizontal: 14,
+  },
+  revealOn: { borderColor: 'rgba(244,198,107,0.55)', backgroundColor: 'rgba(244,198,107,0.14)' },
+  revealText: { color: colors.muted, fontSize: 12.5, fontWeight: '600' },
 });
