@@ -12,6 +12,7 @@ import { useCouple } from '@/hooks/useCouple';
 import { useSharedCanvas } from '@/hooks/useSharedCanvas';
 import { BRUSHES } from '@/lib/brushes';
 import { registerPushToken } from '@/lib/notifications';
+import { publishWidgetUrl } from '@/lib/widget';
 import { supabase } from '@/lib/supabase';
 import { colors, radius, swatches } from '@/theme/tokens';
 import type { Brush } from '@/types';
@@ -75,6 +76,7 @@ function SharedCanvas({
 
   useEffect(() => {
     registerPushToken(userId);
+    publishWidgetUrl(userId);
   }, [userId]);
 
   // the moment the partner first shows up, celebrate + load their name

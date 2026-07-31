@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.digirafthub.trace"
+      "bundleIdentifier": "com.digirafthub.trace",
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.digirafthub.trace"]
+      }
     },
     "android": {
       "package": "com.digirafthub.trace",
@@ -32,6 +35,24 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#e23343"
+        }
+      ],
+      "@bacons/apple-targets",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "Trace",
+              "label": "Trace",
+              "description": "Your person's latest drawing, always on your home screen.",
+              "minWidth": "140dp",
+              "minHeight": "140dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "updatePeriodMillis": 1800000
+            }
+          ]
         }
       ]
     ],

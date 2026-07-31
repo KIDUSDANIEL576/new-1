@@ -6,6 +6,7 @@ import { AppState } from 'react-native';
 import { coupleChannel, TABLES } from '@/lib/backend';
 import { supabase } from '@/lib/supabase';
 import { notifyPartner } from '@/lib/notifications';
+import { renderSnapshot } from '@/lib/widget';
 import type {
   Brush,
   Point,
@@ -302,6 +303,7 @@ export function useSharedCanvas({ coupleId, canvasId, userId, displayName }: Arg
         )
         .then(() => {});
       notifyPartner(coupleId);
+      renderSnapshot(coupleId);
     },
     [canvasId, coupleId, send, trackPresence, userId]
   );
@@ -315,7 +317,8 @@ export function useSharedCanvas({ coupleId, canvasId, userId, displayName }: Arg
     if (mine.dbId != null) {
       await supabase.from(TABLES.strokes).delete().eq('id', mine.dbId);
     }
-  }, [send, strokes, userId]);
+    renderSnapshot(coupleId);
+  }, [coupleId, send, strokes, userId]);
 
   // ---- clear the whole canvas ----
   const clearCanvas = useCallback(async () => {
@@ -323,7 +326,8 @@ export function useSharedCanvas({ coupleId, canvasId, userId, displayName }: Arg
     setLiveStrokes({});
     send('canvas:clear', {});
     await supabase.from(TABLES.strokes).delete().eq('canvas_id', canvasId);
-  }, [canvasId, send]);
+    renderSnapshot(coupleId);
+  }, [canvasId, coupleId, send]);
 
   return {
     strokes,

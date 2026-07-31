@@ -9,6 +9,7 @@ export const TABLES = {
   strokes: 'strokes',
   dailyMarks: 'daily_marks',
   pushTokens: 'push_tokens',
+  widgetTokens: 'widget_tokens',
 } as const;
 
 export const RPCS = {
@@ -19,6 +20,8 @@ export const RPCS = {
 export const EDGE_FUNCTIONS = {
   notifyPartner: 'notify-partner',
   signup: 'trace-signup',
+  renderSnapshot: 'render-snapshot',
+  widgetSnapshot: 'widget-snapshot',
 } as const;
 
 export const coupleChannel = (coupleId: string) => `trace:couple:${coupleId}`;

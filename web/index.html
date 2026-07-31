@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0b10" />
 <title>trace — leave me a trace</title>
-<!-- trace-web v3.0 — real accounts, invite-code pairing, private channel, signed photos -->
+<!-- trace-web v3.1 — real accounts, invite-code pairing, private channel, signed photos, widget snapshots -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -530,6 +530,14 @@ function renderCanvasUI(ctx) {
   const strokes = [];
   const live = new Map();
 
+  // widget snapshot: debounced server-side re-render after canvas changes
+  let snapTimer = null;
+  const queueSnapshot = () => {
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(() =>
+      supabase.functions.invoke("render-snapshot", { body: { coupleId } }).catch(() => {}), 2500);
+  };
+
   /* ---------- background photo state ---------- */
   function parseBg(u) {
     if (!u) return null;
@@ -572,6 +580,7 @@ function renderCanvasUI(ctx) {
     const val = bgString();
     if (canvasId) await supabase.from("canvases").update({ photo_url: val }).eq("id", canvasId);
     if (broadcast && subscribed) channel.send({ type: "broadcast", event: "canvas:bg", payload: { url: val } });
+    queueSnapshot();
   }
   document.getElementById("bgopts").addEventListener("click", () => {
     bgpanel.style.display = bgpanel.style.display === "block" ? "none" : "block";
@@ -594,6 +603,7 @@ function renderCanvasUI(ctx) {
     setBg(null);
     if (canvasId) await supabase.from("canvases").update({ photo_url: null }).eq("id", canvasId);
     if (subscribed) channel.send({ type: "broadcast", event: "canvas:bg", payload: { url: null } });
+    queueSnapshot();
   });
 
   /* ---------- views ---------- */
@@ -887,6 +897,7 @@ function renderCanvasUI(ctx) {
     render();
     persist(s);
     markToday();
+    queueSnapshot();
   }
   board.addEventListener("pointerup", endStroke);
   board.addEventListener("pointercancel", endStroke);
@@ -1003,6 +1014,7 @@ function renderCanvasUI(ctx) {
     strokes.length = 0; live.clear(); render();
     if (subscribed) channel.send({ type: "broadcast", event: "canvas:clear", payload: {} });
     if (canvasId) await supabase.from("strokes").delete().eq("canvas_id", canvasId);
+    queueSnapshot();
   });
   document.getElementById("undo").addEventListener("click", async () => {
     for (let i = strokes.length - 1; i >= 0; i--) {
@@ -1010,6 +1022,7 @@ function renderCanvasUI(ctx) {
         const [removed] = strokes.splice(i, 1); render();
         if (removed.id) await supabase.from("strokes").delete().eq("id", removed.id);
         if (subscribed) channel.send({ type: "broadcast", event: "canvas:reload", payload: {} });
+        queueSnapshot();
         break;
       }
     }
