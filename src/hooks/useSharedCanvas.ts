@@ -93,7 +93,17 @@ export function useSharedCanvas({ coupleId, canvasId, userId, displayName }: Arg
     let attempt = 0;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    function connect() {
+    async function connect() {
+      if (disposed) return;
+
+      // Private channels are authorized against the caller's JWT — make sure
+      // the realtime socket has it before subscribing.
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) await supabase.realtime.setAuth(data.session.access_token);
+      } catch {
+        // subscribe below will surface any real connectivity problem
+      }
       if (disposed) return;
 
       const channel = supabase.channel(coupleChannel(coupleId), {

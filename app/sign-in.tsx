@@ -2,30 +2,53 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { Button, Input, Screen, Wordmark } from '@/components/ui';
+import { EDGE_FUNCTIONS } from '@/lib/backend';
 import { supabase } from '@/lib/supabase';
 import { colors, fonts } from '@/theme/tokens';
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
-  async function sendCode() {
+  async function enter() {
     const target = email.trim().toLowerCase();
     if (!target.includes('@')) {
-      Alert.alert('Enter your email', 'We send a one-time code — no passwords.');
+      Alert.alert('Enter your email', "That's your account name.");
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert('Password', 'Pick a password of at least 6 characters.');
       return;
     }
     setBusy(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email: target,
-      options: { shouldCreateUser: true },
-    });
-    setBusy(false);
-    if (error) {
-      Alert.alert('Could not send code', error.message);
-      return;
+    try {
+      let { error } = await supabase.auth.signInWithPassword({ email: target, password });
+      if (error) {
+        // No account yet? Create one (pre-confirmed) and sign straight in.
+        const { error: fnError } = await supabase.functions.invoke(EDGE_FUNCTIONS.signup, {
+          body: { email: target, password },
+        });
+        if (fnError) {
+          const status = (fnError as { context?: { status?: number } }).context?.status;
+          Alert.alert(
+            status === 409 ? 'Welcome back' : 'Could not sign up',
+            status === 409
+              ? 'That email already has an account — check the password.'
+              : 'Try again in a moment.'
+          );
+          return;
+        }
+        ({ error } = await supabase.auth.signInWithPassword({ email: target, password }));
+        if (error) {
+          Alert.alert('Almost', 'Account created — tap Enter once more to sign in.');
+          return;
+        }
+      }
+      router.replace('/');
+    } finally {
+      setBusy(false);
     }
-    router.push({ pathname: '/verify', params: { email: target } });
   }
 
   return (
@@ -46,16 +69,28 @@ export default function SignIn() {
         </Text>
         <View style={{ height: 28 }} />
         <Input
-          placeholder="you@example.com"
+          placeholder="your email"
           autoCapitalize="none"
           autoComplete="email"
           keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
-          onSubmitEditing={sendCode}
         />
         <View style={{ height: 12 }} />
-        <Button title="Send me a code" onPress={sendCode} loading={busy} />
+        <Input
+          placeholder="your password"
+          autoCapitalize="none"
+          autoComplete="current-password"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+          onSubmitEditing={enter}
+        />
+        <View style={{ height: 12 }} />
+        <Button title="Enter" onPress={enter} loading={busy} />
+        <Text style={styles.hint}>
+          First time? Enter creates your account. Coming back? It signs you in.
+        </Text>
       </KeyboardAvoidingView>
     </Screen>
   );
@@ -70,4 +105,5 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   sub: { color: colors.muted, fontSize: 15.5, marginTop: 12, maxWidth: 320 },
+  hint: { color: colors.muted, fontSize: 12.5, marginTop: 16, textAlign: 'center' },
 });

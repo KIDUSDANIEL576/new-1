@@ -1,24 +1,24 @@
-// Backend namespace. Trace currently co-tenants the DigiRaftHub Supabase
-// project (free-tier project cap), so every DB object is trace_-prefixed and
-// realtime topics use the `trace:` prefix. To move to a dedicated project
-// later: run supabase/migrations/20260716000001_init.sql there, strip the
-// prefixes below, and point .env at the new project.
+// Backend namespace. Trace runs on its own dedicated Supabase project;
+// table and function names are unprefixed there. Realtime topics keep the
+// `trace:` prefix — the private-channel RLS policies authorize
+// `trace:couple:{couple_id}` for couple members only.
 export const TABLES = {
-  couples: 'trace_couples',
-  members: 'trace_members',
-  canvases: 'trace_canvases',
-  strokes: 'trace_strokes',
-  dailyMarks: 'trace_daily_marks',
-  pushTokens: 'trace_push_tokens',
+  couples: 'couples',
+  members: 'members',
+  canvases: 'canvases',
+  strokes: 'strokes',
+  dailyMarks: 'daily_marks',
+  pushTokens: 'push_tokens',
 } as const;
 
 export const RPCS = {
-  createCouple: 'trace_create_couple',
-  joinCouple: 'trace_join_couple',
+  createCouple: 'create_couple',
+  joinCouple: 'join_couple',
 } as const;
 
 export const EDGE_FUNCTIONS = {
-  notifyPartner: 'trace-notify-partner',
+  notifyPartner: 'notify-partner',
+  signup: 'trace-signup',
 } as const;
 
 export const coupleChannel = (coupleId: string) => `trace:couple:${coupleId}`;
