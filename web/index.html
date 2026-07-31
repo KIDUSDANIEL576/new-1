@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0b10" />
 <title>trace — leave me a trace</title>
-<!-- trace-web v1.3 -->
+<!-- trace-web v2.0 -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -14,18 +14,31 @@
     --bg: #0c0b10; --panel: #16151c; --line: rgba(255,255,255,.08);
     --ink: #e23343; --pink: #ff7a9c; --gold: #f4c66b;
     --text: #f3f0f4; --muted: #9a93a5; --blue: #7ec8ff;
+    --glass: rgba(22,21,28,.52);
+    --glass-border: rgba(255,255,255,.10);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
     font-family: Inter, system-ui, -apple-system, sans-serif; overscroll-behavior: none; }
   #app { height: 100%; }
-  .hand { font-family: Caveat, cursive; }
+  svg { display: block; }
+
+  .glass {
+    background: var(--glass);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 24px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+
+  /* ---------- sign in ---------- */
   .signin {
     height: 100%; display: flex; flex-direction: column; justify-content: center;
     padding: 28px 24px; max-width: 460px; margin: 0 auto;
     background:
-      radial-gradient(120% 80% at 20% -10%, rgba(226,51,67,.18), transparent 60%),
-      radial-gradient(120% 80% at 100% 10%, rgba(255,122,156,.14), transparent 55%),
+      radial-gradient(120% 80% at 20% -10%, rgba(226,51,67,.20), transparent 60%),
+      radial-gradient(120% 80% at 100% 10%, rgba(255,122,156,.15), transparent 55%),
+      radial-gradient(80% 60% at 50% 110%, rgba(126,200,255,.08), transparent 60%),
       var(--bg);
   }
   .wordmark { font-family: Caveat, cursive; font-size: 40px; font-weight: 700; letter-spacing: .5px; }
@@ -34,19 +47,21 @@
   .h1 .ink { color: var(--ink); }
   .sub { color: var(--muted); font-size: 15.5px; margin-top: 14px; max-width: 330px; line-height: 1.45; }
   .field {
-    width: 100%; background: var(--panel); border: 1px solid var(--line); color: var(--text);
+    width: 100%; background: var(--glass); backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border); color: var(--text);
     border-radius: 16px; padding: 15px 16px; font-size: 16px; margin-top: 12px; outline: none;
   }
   .field:focus { border-color: rgba(226,51,67,.55); }
   .btn {
     width: 100%; border: none; border-radius: 16px; padding: 15px 16px; font-size: 16px; font-weight: 600;
     margin-top: 12px; cursor: pointer; color: #fff; background: var(--ink);
+    box-shadow: 0 8px 24px rgba(226,51,67,.35);
   }
   .btn:active { transform: translateY(1px); }
   .btn[disabled] { opacity: .6; }
   .demo-row { display: flex; gap: 10px; margin-top: 18px; }
   .demo {
-    flex: 1; background: var(--panel); border: 1px solid var(--line); color: var(--text);
+    flex: 1; color: var(--text);
     border-radius: 16px; padding: 13px 10px; font-size: 14.5px; font-weight: 500; cursor: pointer;
     display: flex; flex-direction: column; gap: 3px; align-items: flex-start;
   }
@@ -59,86 +74,121 @@
   .hint { color: var(--muted); font-size: 12.5px; margin-top: 14px; text-align: center; }
   .err { color: #ff9aa6; font-size: 13.5px; margin-top: 12px; min-height: 18px; text-align: center; }
 
+  /* ---------- canvas screen ---------- */
   .stage { position: fixed; inset: 0; display: flex; flex-direction: column;
-    padding: calc(env(safe-area-inset-top) + 8px) 12px calc(env(safe-area-inset-bottom) + 10px); }
-  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 2px 6px 8px; }
-  .topbar .wm { font-family: Caveat, cursive; font-size: 26px; font-weight: 700; }
+    padding: calc(env(safe-area-inset-top) + 8px) 12px calc(env(safe-area-inset-bottom) + 10px);
+    background:
+      radial-gradient(100% 60% at 0% 0%, rgba(226,51,67,.07), transparent 55%),
+      radial-gradient(100% 60% at 100% 100%, rgba(255,122,156,.06), transparent 55%),
+      var(--bg);
+  }
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 2px 4px 8px; }
+  .topbar .wm { font-family: Caveat, cursive; font-size: 26px; font-weight: 700; margin-right: auto; }
   .topbar .wm .ce { color: var(--ink); }
-  .who { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4b4753; }
+  .streak { display: flex; align-items: center; gap: 5px; border-radius: 999px; padding: 6px 11px;
+    font-size: 13px; font-weight: 600; color: var(--gold); }
+  .streak.zero { color: var(--muted); }
+  .who { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12.5px;
+    border-radius: 999px; padding: 6px 11px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #4b4753; flex: none; }
   .dot.on { background: #57e08a; box-shadow: 0 0 10px rgba(87,224,138,.7); }
+  .iconbtn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;
+    border-radius: 12px; color: var(--muted); cursor: pointer; border: 1px solid var(--glass-border);
+    background: var(--glass); backdrop-filter: blur(12px); }
+  .iconbtn:active { transform: translateY(1px); }
 
   .views { display: flex; gap: 6px; padding: 0 2px 8px; }
   .view {
-    flex: 1; text-align: center; background: var(--panel); border: 1px solid var(--line);
-    color: var(--muted); border-radius: 12px; padding: 8px 4px; font-size: 12.5px; font-weight: 500;
-    cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    color: var(--muted); border-radius: 13px; padding: 8px 4px; font-size: 12.5px; font-weight: 500;
+    cursor: pointer; white-space: nowrap; overflow: hidden;
   }
-  .view.sel { color: var(--text); border-color: rgba(226,51,67,.6); background: rgba(226,51,67,.12); }
+  .view.sel { color: var(--text); border-color: rgba(226,51,67,.55); background: rgba(226,51,67,.14); }
 
   .board {
     position: relative; flex: 1; border-radius: 28px; overflow: hidden;
-    border: 1px solid var(--line);
+    border: 1px solid var(--glass-border);
     background:
       radial-gradient(90% 70% at 15% 0%, rgba(226,51,67,.10), transparent 55%),
       radial-gradient(90% 70% at 100% 100%, rgba(255,122,156,.10), transparent 55%),
       #100f16;
     touch-action: none;
+    box-shadow: 0 18px 50px rgba(0,0,0,.45);
   }
   #bgimg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
-  #bgdim { position: absolute; inset: 0; background: rgba(12,11,16,.35); display: none; }
+  #bgdim { position: absolute; inset: 0; background: #0c0b10; opacity: .35; display: none; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .pill {
     position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
-    background: rgba(22,21,28,.82); border: 1px solid var(--line); backdrop-filter: blur(8px);
     color: var(--text); font-size: 13px; padding: 7px 14px; border-radius: 999px;
-    display: flex; align-items: center; gap: 8px; opacity: 0; transition: opacity .25s; pointer-events: none;
+    display: flex; align-items: center; gap: 8px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 6;
   }
   .pill.show { opacity: 1; }
-  .pill .hand { font-size: 18px; color: var(--pink); line-height: 1; }
+  .pill .penicon { color: var(--pink); }
   .emptyhint {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     color: var(--muted); font-family: Caveat, cursive; font-size: 28px; text-align: center;
     pointer-events: none; padding: 40px; transition: opacity .4s;
   }
-  .removebg {
-    position: absolute; right: 12px; top: 12px; background: rgba(22,21,28,.85); border: 1px solid var(--line);
-    color: var(--muted); border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer; display: none;
-  }
+  .bgtools { position: absolute; right: 12px; top: 12px; display: none; gap: 6px; z-index: 6; }
+  .bgtools .iconbtn { width: 32px; height: 32px; }
 
-  .sheet { position: fixed; inset: 0; background: rgba(5,5,8,.72); backdrop-filter: blur(6px);
-    display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
-  .sheet .card { background: var(--panel); border: 1px solid var(--line); border-radius: 28px;
-    padding: 14px; max-width: 420px; width: 100%; }
-  .sheet .card .cap { font-family: Caveat, cursive; font-size: 26px; text-align: center; padding: 2px 0 10px; }
-  .sheet img { width: 100%; max-height: 55vh; object-fit: contain; border-radius: 18px; background: #000; display: block; }
-  .sheet .row { display: flex; gap: 10px; margin-top: 14px; }
-  .ghost { background: transparent; border: 1px solid var(--line); color: var(--text);
-    border-radius: 16px; padding: 14px; flex: 1; font-size: 15px; cursor: pointer; }
-  .primary { background: var(--ink); border: none; color: #fff; border-radius: 16px;
-    padding: 14px; flex: 1.4; font-size: 15px; font-weight: 600; cursor: pointer; }
-  .progresswrap { position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
-    width: min(320px, 80%); background: rgba(22,21,28,.92); border: 1px solid var(--line);
-    border-radius: 14px; padding: 10px 12px; display: none; z-index: 5; }
+  .bgpanel {
+    position: absolute; right: 12px; top: 52px; z-index: 7; border-radius: 18px; padding: 14px;
+    width: 210px; display: none;
+  }
+  .bgpanel .lbl { font-size: 11.5px; color: var(--muted); margin: 0 0 6px; letter-spacing: .3px; text-transform: uppercase; }
+  .seg { display: flex; gap: 6px; margin-bottom: 12px; }
+  .seg div { flex: 1; text-align: center; font-size: 12.5px; padding: 7px 0; border-radius: 10px;
+    border: 1px solid var(--glass-border); color: var(--muted); cursor: pointer; }
+  .seg div.sel { color: var(--text); background: rgba(226,51,67,.14); border-color: rgba(226,51,67,.5); }
+  input[type=range] { width: 100%; accent-color: var(--ink); }
+
+  .progresswrap {
+    position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
+    width: min(320px, 80%); border-radius: 14px; padding: 10px 12px; display: none; z-index: 8;
+  }
   .progresswrap .label { font-size: 12.5px; color: var(--text); margin-bottom: 6px; }
   .progresswrap .bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
   .progresswrap .fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--ink), var(--pink)); transition: width .15s; }
 
+  /* replay */
+  .replaybar {
+    position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 7;
+    border-radius: 18px; padding: 10px 14px; display: none; align-items: center; gap: 12px;
+  }
+  .replaybar .iconbtn { flex: none; }
+  .replaybar input[type=range] { flex: 1; }
+  .replaytag {
+    position: absolute; left: 14px; top: 14px; z-index: 6; border-radius: 999px; padding: 6px 12px;
+    font-family: Caveat, cursive; font-size: 18px; color: var(--gold); display: none;
+  }
+
+  .sheet { position: fixed; inset: 0; background: rgba(5,5,8,.65);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  .sheet .card { border-radius: 28px; padding: 14px; max-width: 420px; width: 100%; }
+  .sheet .card .cap { font-family: Caveat, cursive; font-size: 26px; text-align: center; padding: 2px 0 10px; }
+  .sheet img { width: 100%; max-height: 52vh; object-fit: contain; border-radius: 18px; background: #000; display: block; }
+  .sheet .row { display: flex; gap: 10px; margin-top: 14px; }
+  .ghost { background: transparent; border: 1px solid var(--glass-border); color: var(--text);
+    border-radius: 16px; padding: 14px; flex: 1; font-size: 15px; cursor: pointer; }
+  .primary { background: var(--ink); border: none; color: #fff; border-radius: 16px;
+    padding: 14px; flex: 1.4; font-size: 15px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 8px 24px rgba(226,51,67,.35); }
+
   .brushes { display: flex; gap: 6px; padding: 10px 2px 0; }
   .brush {
-    flex: 1; text-align: center; background: var(--panel); border: 1px solid var(--line);
-    color: var(--muted); border-radius: 12px; padding: 8px 4px; font-size: 12.5px; font-weight: 500; cursor: pointer;
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    color: var(--muted); border-radius: 13px; padding: 8px 2px 6px; font-size: 10.5px; font-weight: 500; cursor: pointer;
   }
-  .brush.sel { color: var(--text); border-color: rgba(255,122,156,.6); background: rgba(255,122,156,.10); }
+  .brush.sel { color: var(--text); border-color: rgba(255,122,156,.55); background: rgba(255,122,156,.12); }
 
   .toolbar { display: flex; align-items: center; gap: 8px; padding: 10px 2px 0; }
   .swatches { display: flex; gap: 9px; flex: 1; }
   .swatch { width: 29px; height: 29px; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
     box-shadow: 0 1px 4px rgba(0,0,0,.4); }
   .swatch.sel { border-color: #fff; transform: scale(1.06); }
-  .tool { background: var(--panel); border: 1px solid var(--line); color: var(--text);
-    border-radius: 14px; padding: 10px 12px; font-size: 13.5px; cursor: pointer; font-weight: 500; }
-  .tool:active { transform: translateY(1px); }
   .loading { height:100%; display:flex; align-items:center; justify-content:center; color: var(--muted);
     font-family: Caveat, cursive; font-size: 30px; }
 </style>
@@ -158,10 +208,32 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 const SWATCHES = ["#e23343", "#ff7a9c", "#ffffff", "#f4c66b", "#7ec8ff"];
-const BRUSHES = ["marker", "glow", "neon", "chalk"];
 const STROKE_W = 0.011;
 const app = document.getElementById("app");
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+/* professional stroke icons (24px grid, editor-tool style) */
+const I = {
+  pen: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+  sparkles: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  highlighter: '<path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4l8 8Z"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+  history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  inbox: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  sliders: '<line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+};
+const icon = (n, sz = 18) =>
+  `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
 
 (async function boot() {
   const { data: { session } } = await supabase.auth.getSession();
@@ -182,8 +254,8 @@ function renderSignIn() {
       <p class="sub">Whatever one of you draws appears on the other's phone — stroke by stroke, in real time.</p>
 
       <div class="demo-row">
-        <button class="demo" data-demo="you@trace.love"><b>I'm Person A</b><span>one-tap demo</span></button>
-        <button class="demo" data-demo="partner@trace.love"><b>I'm Person B</b><span>one-tap demo</span></button>
+        <button class="demo glass" data-demo="you@trace.love"><b>I'm Person A</b><span>one-tap demo</span></button>
+        <button class="demo glass" data-demo="partner@trace.love"><b>I'm Person B</b><span>one-tap demo</span></button>
       </div>
       <div class="or">or use your own</div>
 
@@ -270,36 +342,56 @@ function renderCanvasUI(ctx) {
     <div class="stage">
       <div class="topbar">
         <div class="wm">tra<span class="ce">ce</span></div>
-        <div class="who"><span class="dot" id="pdot"></span><span id="pwho">${pName}</span>
-          <span class="tool" id="signout" style="padding:6px 10px;font-size:12px;margin-left:6px">Sign out</span></div>
+        <div class="streak glass zero" id="streak">${icon("flame", 15)}<span id="streakn">0</span></div>
+        <div class="who glass"><span class="dot" id="pdot"></span><span id="pwho">${pName}</span></div>
+        <div class="iconbtn" id="signout" title="Sign out">${icon("logout", 16)}</div>
       </div>
       <div class="views">
-        <div class="view sel" data-view="all">🤝 Together</div>
-        <div class="view" data-view="theirs">💝 From ${pName}</div>
-        <div class="view" data-view="mine">💌 My ink</div>
+        <div class="view glass sel" data-view="all">${icon("users", 14)} Together</div>
+        <div class="view glass" data-view="theirs">${icon("inbox", 14)} From ${pName}</div>
+        <div class="view glass" data-view="mine">${icon("send", 14)} My ink</div>
       </div>
       <div class="board" id="board">
         <img id="bgimg" alt="" /><div id="bgdim"></div>
         <canvas id="cv"></canvas>
-        <div class="pill" id="pill"><span class="hand">✎</span><span id="pilltext"></span></div>
+        <div class="pill glass" id="pill"><span class="penicon">${icon("pen", 15)}</span><span id="pilltext"></span></div>
         <div class="emptyhint" id="empty">draw something…<br/>it appears on ${pName}'s phone, live.</div>
-        <button class="removebg" id="removebg">✕ photo</button>
-        <div class="progresswrap" id="prog">
+        <div class="bgtools" id="bgtools">
+          <div class="iconbtn" id="bgopts" title="Photo options">${icon("sliders", 15)}</div>
+          <div class="iconbtn" id="removebg" title="Remove photo">${icon("x", 15)}</div>
+        </div>
+        <div class="bgpanel glass" id="bgpanel">
+          <div class="lbl">Photo fit</div>
+          <div class="seg" id="fitseg">
+            <div data-fit="cover" class="sel">Fill</div>
+            <div data-fit="contain">Fit</div>
+          </div>
+          <div class="lbl">Darken photo</div>
+          <input type="range" id="dimrange" min="0" max="70" value="35" />
+        </div>
+        <div class="replaytag glass" id="replaytag">your story, replayed</div>
+        <div class="replaybar glass" id="replaybar">
+          <div class="iconbtn" id="rplay">${icon("play", 16)}</div>
+          <input type="range" id="rslider" min="0" max="100" value="0" />
+          <div class="iconbtn" id="rclose">${icon("x", 16)}</div>
+        </div>
+        <div class="progresswrap glass" id="prog">
           <div class="label" id="proglabel">sending photo…</div>
           <div class="bar"><div class="fill" id="progfill"></div></div>
         </div>
       </div>
-      <div class="brushes" id="brushes">
-        <div class="brush sel" data-brush="marker">Marker</div>
-        <div class="brush" data-brush="glow">Glow</div>
-        <div class="brush" data-brush="neon">Neon</div>
-        <div class="brush" data-brush="chalk">Chalk</div>
+      <div class="brushes">
+        <div class="brush glass sel" data-brush="marker">${icon("pen", 17)}Marker</div>
+        <div class="brush glass" data-brush="glow">${icon("sparkles", 17)}Glow</div>
+        <div class="brush glass" data-brush="neon">${icon("zap", 17)}Neon</div>
+        <div class="brush glass" data-brush="chalk">${icon("highlighter", 17)}Chalk</div>
       </div>
       <div class="toolbar">
         <div class="swatches" id="swatches"></div>
-        <button class="tool" id="photo">📷</button>
-        <button class="tool" id="undo">Undo</button>
-        <button class="tool" id="clear">Clear</button>
+        <div class="iconbtn" id="photo" title="Photo background">${icon("image", 17)}</div>
+        <div class="iconbtn" id="replaybtn" title="Replay your story">${icon("history", 17)}</div>
+        <div class="iconbtn" id="undo" title="Undo my last stroke">${icon("undo", 17)}</div>
+        <div class="iconbtn" id="clear" title="Clear canvas">${icon("trash", 17)}</div>
       </div>
     </div>`;
 
@@ -311,27 +403,76 @@ function renderCanvasUI(ctx) {
   const empty = document.getElementById("empty");
   const bgimg = document.getElementById("bgimg");
   const bgdim = document.getElementById("bgdim");
-  const removebgBtn = document.getElementById("removebg");
+  const bgtools = document.getElementById("bgtools");
+  const bgpanel = document.getElementById("bgpanel");
+  const dimrange = document.getElementById("dimrange");
   let color = SWATCHES[0];
   let brush = "marker";
-  let view = "all"; // all | mine | theirs
+  let view = "all";
   let W = 0, H = 0, dpr = 1;
+  let bgState = null; // { url, fit, dim }
 
   const strokes = [];
   const live = new Map();
 
-  function setBg(url) {
-    if (url) {
-      bgimg.src = url; bgimg.style.display = "block";
-      bgdim.style.display = "block"; removebgBtn.style.display = "block";
+  /* ---------- background photo state ---------- */
+  function parseBg(u) {
+    if (!u) return null;
+    const [url, frag = ""] = u.split("#");
+    const p = new URLSearchParams(frag);
+    return { url, fit: p.get("fit") === "contain" ? "contain" : "cover",
+             dim: p.get("dim") != null ? Math.max(0, Math.min(70, +p.get("dim") || 0)) : 35 };
+  }
+  const bgString = () => bgState ? `${bgState.url}#fit=${bgState.fit}&dim=${bgState.dim}` : null;
+  function setBg(u) {
+    bgState = parseBg(u);
+    if (bgState) {
+      bgimg.src = bgState.url;
+      bgimg.style.objectFit = bgState.fit;
+      bgimg.style.display = "block";
+      bgdim.style.opacity = bgState.dim / 100;
+      bgdim.style.display = "block";
+      bgtools.style.display = "flex";
+      document.querySelectorAll("#fitseg div").forEach(d =>
+        d.classList.toggle("sel", d.dataset.fit === bgState.fit));
+      dimrange.value = bgState.dim;
     } else {
       bgimg.removeAttribute("src"); bgimg.style.display = "none";
-      bgdim.style.display = "none"; removebgBtn.style.display = "none";
+      bgdim.style.display = "none"; bgtools.style.display = "none";
+      bgpanel.style.display = "none";
     }
   }
   setBg(ctx.photoUrl);
 
-  // views
+  async function persistBg(broadcast = true) {
+    const val = bgString();
+    if (canvasId) await supabase.from("trace_canvases").update({ photo_url: val }).eq("id", canvasId);
+    if (broadcast && subscribed) channel.send({ type: "broadcast", event: "canvas:bg", payload: { url: val } });
+  }
+  document.getElementById("bgopts").addEventListener("click", () => {
+    bgpanel.style.display = bgpanel.style.display === "block" ? "none" : "block";
+  });
+  document.querySelectorAll("#fitseg div").forEach(d => d.addEventListener("click", () => {
+    if (!bgState) return;
+    bgState.fit = d.dataset.fit;
+    bgimg.style.objectFit = bgState.fit;
+    document.querySelectorAll("#fitseg div").forEach(x => x.classList.toggle("sel", x === d));
+    persistBg();
+  }));
+  let dimTimer = null;
+  dimrange.addEventListener("input", () => {
+    if (!bgState) return;
+    bgState.dim = +dimrange.value;
+    bgdim.style.opacity = bgState.dim / 100;
+    clearTimeout(dimTimer); dimTimer = setTimeout(() => persistBg(), 350);
+  });
+  document.getElementById("removebg").addEventListener("click", async () => {
+    setBg(null);
+    if (canvasId) await supabase.from("trace_canvases").update({ photo_url: null }).eq("id", canvasId);
+    if (subscribed) channel.send({ type: "broadcast", event: "canvas:bg", payload: { url: null } });
+  });
+
+  /* ---------- views ---------- */
   document.querySelectorAll(".view").forEach(v => v.addEventListener("click", () => {
     view = v.dataset.view;
     document.querySelectorAll(".view").forEach(x => x.classList.remove("sel"));
@@ -341,14 +482,12 @@ function renderCanvasUI(ctx) {
   const visible = (s) =>
     view === "all" ? true : view === "mine" ? s.authorId === user.id : s.authorId !== user.id;
 
-  // brushes
+  /* ---------- brushes & colors ---------- */
   document.querySelectorAll(".brush").forEach(b => b.addEventListener("click", () => {
     brush = b.dataset.brush;
     document.querySelectorAll(".brush").forEach(x => x.classList.remove("sel"));
     b.classList.add("sel");
   }));
-
-  // swatches
   const sw = document.getElementById("swatches");
   SWATCHES.forEach((c, i) => {
     const el = document.createElement("div");
@@ -361,6 +500,7 @@ function renderCanvasUI(ctx) {
     sw.appendChild(el);
   });
 
+  /* ---------- canvas ---------- */
   function resize() {
     const r = board.getBoundingClientRect();
     W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2.5);
@@ -386,13 +526,14 @@ function renderCanvasUI(ctx) {
     if (pts.length === 1) g.lineTo(pts[0][0] * W + 0.1, pts[0][1] * H + 0.1);
     for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0] * W, pts[i][1] * H);
     g.stroke();
-    if (b === "neon") { // bright core pass
+    if (b === "neon") {
       g.shadowBlur = 0; g.globalAlpha = 0.9; g.strokeStyle = "#ffffff"; g.lineWidth = Math.max(1, w * 0.22);
       g.stroke();
     }
     g.shadowBlur = 0; g.globalAlpha = 1;
   }
   function render() {
+    if (replay.active) { renderReplay(); return; }
     g.clearRect(0, 0, W, H);
     let shown = 0;
     for (const s of strokes) if (visible(s)) { drawStroke(s); shown++; }
@@ -400,6 +541,109 @@ function renderCanvasUI(ctx) {
     empty.style.opacity = shown ? 0 : 1;
   }
 
+  /* ---------- Relationship Replay ---------- */
+  const replay = { active: false, playing: false, snap: [], total: 0, idx: 0, raf: 0, last: 0 };
+  const rbar = document.getElementById("replaybar");
+  const rtag = document.getElementById("replaytag");
+  const rslider = document.getElementById("rslider");
+  const rplayBtn = document.getElementById("rplay");
+  const SPEED = 220; // points per second
+
+  document.getElementById("replaybtn").addEventListener("click", () => {
+    if (!strokes.length) {
+      pilltext.textContent = "nothing to replay yet — draw something first";
+      pill.classList.add("show"); setTimeout(() => pill.classList.remove("show"), 2200);
+      return;
+    }
+    replay.snap = strokes.slice();
+    replay.total = replay.snap.reduce((n, s) => n + s.points.length, 0);
+    replay.idx = 0; replay.active = true;
+    rslider.max = replay.total; rslider.value = 0;
+    rbar.style.display = "flex"; rtag.style.display = "block";
+    empty.style.opacity = 0;
+    startReplayPlayback();
+  });
+  function startReplayPlayback() {
+    replay.playing = true;
+    rplayBtn.innerHTML = icon("pause", 16);
+    replay.last = performance.now();
+    cancelAnimationFrame(replay.raf);
+    const tick = (t) => {
+      if (!replay.playing || !replay.active) return;
+      replay.idx = Math.min(replay.total, replay.idx + ((t - replay.last) / 1000) * SPEED);
+      replay.last = t;
+      rslider.value = Math.round(replay.idx);
+      renderReplay();
+      if (replay.idx >= replay.total) { pauseReplayPlayback(); return; }
+      replay.raf = requestAnimationFrame(tick);
+    };
+    replay.raf = requestAnimationFrame(tick);
+  }
+  function pauseReplayPlayback() {
+    replay.playing = false;
+    rplayBtn.innerHTML = icon("play", 16);
+    cancelAnimationFrame(replay.raf);
+  }
+  rplayBtn.addEventListener("click", () => {
+    if (replay.playing) { pauseReplayPlayback(); return; }
+    if (replay.idx >= replay.total) replay.idx = 0;
+    startReplayPlayback();
+  });
+  rslider.addEventListener("input", () => {
+    pauseReplayPlayback();
+    replay.idx = +rslider.value;
+    renderReplay();
+  });
+  document.getElementById("rclose").addEventListener("click", () => {
+    pauseReplayPlayback();
+    replay.active = false;
+    rbar.style.display = "none"; rtag.style.display = "none";
+    render();
+  });
+  function renderReplay() {
+    g.clearRect(0, 0, W, H);
+    let remaining = Math.round(replay.idx);
+    for (const s of replay.snap) {
+      if (remaining <= 0) break;
+      const take = Math.min(remaining, s.points.length);
+      drawStroke({ ...s, points: s.points.slice(0, take) });
+      remaining -= take;
+    }
+  }
+
+  /* ---------- Daily Love Streak ---------- */
+  const streakEl = document.getElementById("streak");
+  const streakN = document.getElementById("streakn");
+  const localDay = (d) => {
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+  async function markToday() {
+    try {
+      await supabase.from("trace_daily_marks").upsert(
+        { couple_id: coupleId, day: localDay(new Date()), user_id: user.id },
+        { onConflict: "couple_id,day,user_id", ignoreDuplicates: true });
+    } catch (e) { /* streak is decoration; never block drawing */ }
+    refreshStreak();
+  }
+  async function refreshStreak() {
+    const since = new Date(); since.setDate(since.getDate() - 90);
+    const { data } = await supabase.from("trace_daily_marks")
+      .select("day, user_id").eq("couple_id", coupleId).gte("day", localDay(since));
+    if (!data) return;
+    const days = {};
+    for (const r of data) (days[r.day] ??= new Set()).add(r.user_id);
+    const both = (k) => days[k] && days[k].size >= 2;
+    const cursor = new Date();
+    if (!both(localDay(cursor))) cursor.setDate(cursor.getDate() - 1); // today not complete yet — count from yesterday
+    let n = 0;
+    while (both(localDay(cursor))) { n++; cursor.setDate(cursor.getDate() - 1); }
+    streakN.textContent = n;
+    streakEl.classList.toggle("zero", n === 0);
+    streakEl.title = n ? `${n}-day streak — you both drew ${n} day${n > 1 ? "s" : ""} in a row` : "Draw on the same day as your person to start a streak";
+  }
+
+  /* ---------- realtime ---------- */
   let channel = null, subscribed = false;
   let sendBuf = [], sendTimer = null, curStrokeId = null;
 
@@ -423,7 +667,7 @@ function renderCanvasUI(ctx) {
     });
     channel.on("broadcast", { event: "stroke:end" }, ({ payload }) => {
       const s = live.get(payload.strokeId);
-      if (s) { strokes.push(s); live.delete(payload.strokeId); render(); }
+      if (s) { strokes.push(s); live.delete(payload.strokeId); render(); refreshStreak(); }
     });
     channel.on("broadcast", { event: "canvas:clear" }, () => {
       strokes.length = 0; live.clear(); render();
@@ -453,6 +697,7 @@ function renderCanvasUI(ctx) {
         subscribed = true;
         await channel.track({ userId: user.id, name: myName, drawing: false });
         await loadHistory();
+        refreshStreak();
       }
     });
   }
@@ -479,6 +724,7 @@ function renderCanvasUI(ctx) {
     if (!sendTimer) sendTimer = setTimeout(flushPoints, 25);
   }
 
+  /* ---------- drawing input ---------- */
   let drawingStroke = null;
   const norm = (e) => {
     const r = board.getBoundingClientRect();
@@ -487,7 +733,10 @@ function renderCanvasUI(ctx) {
   function setDrawingFlag(v) { if (subscribed) channel.track({ userId: user.id, name: myName, drawing: v }); }
 
   board.addEventListener("pointerdown", (e) => {
+    if (replay.active) return;
+    if (e.target.closest(".bgtools, .bgpanel, .replaybar, .progresswrap")) return;
     if (e.button != null && e.button !== 0 && e.pointerType === "mouse") return;
+    bgpanel.style.display = "none";
     board.setPointerCapture(e.pointerId);
     curStrokeId = uid();
     drawingStroke = { authorId: user.id, color, brush, width: STROKE_W, points: [norm(e)] };
@@ -513,6 +762,7 @@ function renderCanvasUI(ctx) {
     strokes.push(s);
     render();
     persist(s);
+    markToday();
   }
   board.addEventListener("pointerup", endStroke);
   board.addEventListener("pointercancel", endStroke);
@@ -526,7 +776,7 @@ function renderCanvasUI(ctx) {
     if (data) s.id = data.id;
   }
 
-  // ---- photo background: preview sheet → instant apply → progress upload ----
+  /* ---------- photo import: preview → instant apply → progress upload ---------- */
   const photoInput = document.getElementById("photoInput");
   const prog = document.getElementById("prog");
   const progFill = document.getElementById("progfill");
@@ -547,7 +797,7 @@ function renderCanvasUI(ctx) {
     const sheet = document.createElement("div");
     sheet.className = "sheet";
     sheet.innerHTML = `
-      <div class="card">
+      <div class="card glass">
         <div class="cap">draw on this photo?</div>
         <img src="${previewUrl}" alt="preview" />
         <div class="row">
@@ -561,17 +811,16 @@ function renderCanvasUI(ctx) {
   }
 
   async function applyPhoto(previewUrl, blob) {
-    const prevBg = bgimg.style.display === "block" ? bgimg.src : null;
-    setBg(previewUrl); // instant — you see it before the upload even starts
+    const prevBg = bgString();
+    setBg(previewUrl + "#fit=cover&dim=35"); // instant local preview
     showProgress(0);
     try {
       const path = `${coupleId}/${uid()}.jpg`;
       await uploadWithProgress("trace-photos", path, blob, showProgress);
       const url = supabase.storage.from("trace-photos").getPublicUrl(path).data.publicUrl;
-      const { error: cerr } = await supabase.from("trace_canvases").update({ photo_url: url }).eq("id", canvasId);
-      if (cerr) throw cerr;
-      bgimg.src = url; // swap preview for the hosted copy
-      if (subscribed) channel.send({ type: "broadcast", event: "canvas:bg", payload: { url } });
+      bgState.url = url; // keep chosen fit/dim, swap to hosted copy
+      bgimg.src = url;
+      await persistBg();
       finishProgress(`on ${partnerName}'s phone ✓`);
     } catch (e) {
       hideProgress();
@@ -612,11 +861,6 @@ function renderCanvasUI(ctx) {
     setTimeout(() => { prog.style.display = "none"; }, 1400);
   }
   function hideProgress() { prog.style.display = "none"; }
-  removebgBtn.addEventListener("click", async () => {
-    setBg(null);
-    if (canvasId) await supabase.from("trace_canvases").update({ photo_url: null }).eq("id", canvasId);
-    if (subscribed) channel.send({ type: "broadcast", event: "canvas:bg", payload: { url: null } });
-  });
 
   async function shrinkImage(file, maxSide, quality) {
     const img = await new Promise((res, rej) => {
@@ -632,7 +876,7 @@ function renderCanvasUI(ctx) {
     return await new Promise((res) => c.toBlob(res, "image/jpeg", quality));
   }
 
-  // ---- buttons ----
+  /* ---------- toolbar actions ---------- */
   document.getElementById("clear").addEventListener("click", async () => {
     strokes.length = 0; live.clear(); render();
     if (subscribed) channel.send({ type: "broadcast", event: "canvas:clear", payload: {} });
@@ -654,7 +898,7 @@ function renderCanvasUI(ctx) {
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && subscribed) loadHistory();
+    if (document.visibilityState === "visible" && subscribed) { loadHistory(); refreshStreak(); }
   });
 
   connect();
