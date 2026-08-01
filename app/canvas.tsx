@@ -1,5 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CanvasBoard } from '@/components/CanvasBoard';
@@ -12,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCouple } from '@/hooks/useCouple';
 import { useSharedCanvas } from '@/hooks/useSharedCanvas';
 import { BRUSHES } from '@/lib/brushes';
+import { playBuzz, primeBuzz, releaseBuzz } from '@/lib/buzz';
 import { useEntitlement } from '@/lib/entitlements';
 import { configureIap } from '@/lib/iap';
 import { registerPushToken } from '@/lib/notifications';
@@ -65,6 +67,10 @@ function SharedCanvas({
   const { status, refresh: refreshTier } = useEntitlement();
   const [paywall, setPaywall] = useState<PaywallReason | null>(null);
   const [revealing, setRevealing] = useState(false);
+  // Ring lights up once you've finished a trace — buzz them to something
+  // waiting, not to an empty canvas.
+  const [ringReady, setRingReady] = useState(false);
+  const [ringCooldown, setRingCooldown] = useState(0);
 
   const {
     strokes,
@@ -75,6 +81,7 @@ function SharedCanvas({
     beginStroke,
     addPoint,
     endStroke,
+    sendBuzz,
     undoLast,
     clearCanvas,
     canUndo,
@@ -88,6 +95,10 @@ function SharedCanvas({
       setBrush('marker');
       setPaywall('brush');
     }, [refreshTier]),
+    onBuzz: useCallback(() => {
+      void playBuzz();
+      toast.show('❤️ they’re thinking about you');
+    }, [toast]),
   });
 
   useEffect(() => {
@@ -96,7 +107,37 @@ function SharedCanvas({
     // the Supabase user id IS the RevenueCat app user id — that's how the
     // webhook maps a purchase back to this couple
     void configureIap(userId);
+    primeBuzz(); // load the ring before the first one arrives
+    return () => {
+      void releaseBuzz();
+    };
   }, [userId]);
+
+  // cooldown ticker — the server decides the length, this just counts it down
+  useEffect(() => {
+    if (ringCooldown <= 0) return;
+    const t = setTimeout(() => setRingCooldown((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [ringCooldown]);
+
+  async function onRing() {
+    if (ringCooldown > 0) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setRingReady(false);
+    const res = await sendBuzz();
+    if (res.sent) {
+      setRingCooldown(120);
+      toast.show(`ringing ${partnerName ?? 'them'}…`);
+    } else if (res.retryAfter) {
+      setRingCooldown(res.retryAfter);
+      toast.show(`give them a moment — ${res.retryAfter}s`);
+    } else if (res.reason === 'partner has no push token') {
+      // the in-app broadcast still went out; only the push couldn't
+      toast.show('rang their app — their phone can’t be reached yet');
+    } else {
+      toast.show('couldn’t reach them just now');
+    }
+  }
 
   // a locked brush can only be selected once the couple is actually Pro
   useEffect(() => {
@@ -194,7 +235,10 @@ function SharedCanvas({
         brushWidth={BRUSHES[brush].width}
         onBegin={beginStroke}
         onPoint={addPoint}
-        onEnd={endStroke}
+        onEnd={(id) => {
+          void endStroke(id);
+          setRingReady(true); // you left something — now you can ring them to it
+        }}
         revealing={revealing}
       />
 
@@ -225,6 +269,24 @@ function SharedCanvas({
             </Text>
           </Pressable>
         )}
+        <Pressable
+          onPress={onRing}
+          disabled={ringCooldown > 0}
+          style={[
+            styles.ring,
+            ringReady && ringCooldown === 0 && styles.ringReady,
+            ringCooldown > 0 && styles.ringSpent,
+          ]}
+        >
+          <Text
+            style={[
+              styles.ringText,
+              ringReady && ringCooldown === 0 && { color: colors.gold },
+            ]}
+          >
+            {ringCooldown > 0 ? `${ringCooldown}s` : '🔔 Ring'}
+          </Text>
+        </Pressable>
       </View>
 
       <Paywall
@@ -283,4 +345,20 @@ const styles = StyleSheet.create({
   },
   revealOn: { borderColor: 'rgba(244,198,107,0.55)', backgroundColor: 'rgba(244,198,107,0.14)' },
   revealText: { color: colors.muted, fontSize: 12.5, fontWeight: '600' },
+  ring: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 78,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panel2,
+    borderRadius: radius.button,
+    paddingHorizontal: 14,
+  },
+  ringReady: {
+    borderColor: 'rgba(244,198,107,0.55)',
+    backgroundColor: 'rgba(244,198,107,0.14)',
+  },
+  ringSpent: { opacity: 0.5 },
+  ringText: { color: colors.muted, fontSize: 12.5, fontWeight: '600' },
 });

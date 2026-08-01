@@ -34,7 +34,8 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#e23343"
+          "color": "#e23343",
+          "sounds": ["./assets/buzz.wav"]
         }
       ],
       "@bacons/apple-targets",

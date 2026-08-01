@@ -6,7 +6,7 @@ import { AppState } from 'react-native';
 import { coupleChannel, TABLES } from '@/lib/backend';
 import { isTierError } from '@/lib/entitlements';
 import { supabase } from '@/lib/supabase';
-import { notifyPartner } from '@/lib/notifications';
+import { buzzPartner, notifyPartner, type BuzzResult } from '@/lib/notifications';
 import { renderSnapshot } from '@/lib/widget';
 import type {
   Brush,
@@ -36,6 +36,8 @@ interface Args {
    * and this fires — rather than showing ink the partner will never receive.
    */
   onTierRejected?: () => void;
+  /** The partner pressed Ring while this app is open. */
+  onBuzz?: () => void;
 }
 
 /**
@@ -54,6 +56,7 @@ export function useSharedCanvas({
   userId,
   displayName,
   onTierRejected,
+  onBuzz,
 }: Args) {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [liveStrokes, setLiveStrokes] = useState<Record<string, Stroke>>({});
@@ -62,6 +65,10 @@ export function useSharedCanvas({
   const [connection, setConnection] = useState<ConnectionState>('connecting');
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  // held in a ref so the channel subscription (built once) always reaches the
+  // current handler without tearing down and resubscribing
+  const onBuzzRef = useRef(onBuzz);
+  onBuzzRef.current = onBuzz;
   const currentStrokeRef = useRef<Stroke | null>(null);
   const pendingPointsRef = useRef<Point[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -168,6 +175,11 @@ export function useSharedCanvas({
         .on('broadcast', { event: 'canvas:clear' }, () => {
           setStrokes([]);
           setLiveStrokes({});
+        })
+        // The app is open, so no push notification will fire — ring it here.
+        // This is also the fast path: same sub-300ms window as strokes.
+        .on('broadcast', { event: 'buzz' }, () => {
+          onBuzzRef.current?.();
         })
         .on('presence', { event: 'sync' }, () => {
           const entries = Object.values(channel.presenceState<PresenceState>()).flat();
@@ -344,6 +356,15 @@ export function useSharedCanvas({
     renderSnapshot(coupleId);
   }, [coupleId, send, strokes, userId]);
 
+  // ---- ring the partner's phone ----
+  // Two paths on purpose: the broadcast rings them instantly if their app is
+  // open, the edge function pushes if it isn't. The server owns the rate limit
+  // and its answer is what the button's cooldown follows.
+  const sendBuzz = useCallback(async (): Promise<BuzzResult> => {
+    send('buzz', { from: userId });
+    return await buzzPartner(coupleId);
+  }, [coupleId, send, userId]);
+
   // ---- clear the whole canvas ----
   const clearCanvas = useCallback(async () => {
     setStrokes([]);
@@ -361,6 +382,7 @@ export function useSharedCanvas({
     connection,
     beginStroke,
     addPoint,
+    sendBuzz,
     endStroke,
     undoLast,
     clearCanvas,

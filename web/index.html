@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0b10" />
 <title>trace — leave me a trace</title>
-<!-- trace-web v4.0 — Trace Forever entitlements, tier gating, invisible ink, paywall -->
+<!-- trace-web v4.1 — buzz: ring your person's phone, throttled server-side -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -211,6 +211,23 @@
   .iconbtn.on { color: var(--gold); border-color: rgba(244,198,107,.55); background: rgba(244,198,107,.14); }
   .iconbtn.hidden { display: none; }
 
+  /* buzz */
+  .iconbtn.ready { color: var(--gold); border-color: rgba(244,198,107,.55); background: rgba(244,198,107,.14); }
+  .iconbtn.cooling { opacity: .45; pointer-events: none; position: relative; }
+  .iconbtn .cd { position: absolute; font-size: 9px; font-weight: 700; color: var(--gold); }
+  @keyframes buzzpulse {
+    0%   { box-shadow: 0 18px 50px rgba(0,0,0,.45), inset 0 0 0 0 rgba(244,198,107,0); }
+    18%  { box-shadow: 0 18px 50px rgba(0,0,0,.45), inset 0 0 90px 6px rgba(244,198,107,.42); }
+    100% { box-shadow: 0 18px 50px rgba(0,0,0,.45), inset 0 0 0 0 rgba(244,198,107,0); }
+  }
+  .board.buzzing { animation: buzzpulse 1.15s ease-out 3; }
+  .buzztag {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+    z-index: 9; border-radius: 999px; padding: 10px 18px; font-family: Caveat, cursive;
+    font-size: 26px; color: var(--gold); opacity: 0; transition: opacity .3s; pointer-events: none;
+  }
+  .buzztag.show { opacity: 1; }
+
   .paywall .card { max-width: 400px; padding: 22px 20px 18px; text-align: center; }
   .paywall .kicker { font-family: Caveat, cursive; font-size: 30px; line-height: 1.05; }
   .paywall .kicker .ink { color: var(--ink); }
@@ -260,6 +277,47 @@ async function refreshTier() {
   tier.replayDays = row.replay_days;   // null = full history
   return tier;
 }
+/* ---------- buzz ----------
+   The ring, synthesized rather than fetched: no asset, no CORS, no load delay,
+   and it can't fail to arrive. Same motif as the app's buzz.wav — two soft
+   sine partials a fifth apart, struck twice, twice. */
+const RING_STRIKES = [0, 0.7, 1.65, 2.35]; // seconds
+const RING_PARTIALS = [[659.25, 1.0], [987.77, 0.55], [1318.5, 0.18]];
+let audioCtx = null;
+
+function ringAudio() {
+  try {
+    audioCtx ??= new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const t0 = audioCtx.currentTime + 0.02;
+    for (const at of RING_STRIKES) {
+      for (const [freq, amp] of RING_PARTIALS) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        // struck bell: near-instant attack, long exponential decay
+        gain.gain.setValueAtTime(0.0001, t0 + at);
+        gain.gain.exponentialRampToValueAtTime(amp * 0.22, t0 + at + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.55);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t0 + at);
+        osc.stop(t0 + at + 0.6);
+      }
+    }
+  } catch { /* audio is a bonus; the flash and the buzz still land */ }
+}
+
+// Browsers won't let a page make noise before the user has touched it, so
+// unlock the context on the first interaction — long before any buzz arrives.
+["pointerdown", "keydown"].forEach(ev =>
+  window.addEventListener(ev, () => {
+    try {
+      audioCtx ??= new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+    } catch { /* not available in this browser */ }
+  }, { once: true }));
+
 const brushLocked = (b) => !tier.isPro && !FREE_BRUSHES.has(b);
 const photosLeft = () =>
   tier.photoLimit == null ? Infinity : Math.max(0, tier.photoLimit - tier.photosToday);
@@ -290,6 +348,7 @@ const I = {
   infinity: '<path d="M6 16c3.5 0 5-8 8.5-8a4 4 0 0 1 0 8C11 16 9.5 8 6 8a4 4 0 0 0 0 8"/>',
   heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
+  bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
 };
 const icon = (n, sz = 18) =>
   `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
@@ -537,6 +596,7 @@ function renderCanvasUI(ctx) {
           <input type="range" id="dimrange" min="0" max="70" value="35" />
         </div>
         <div class="replaytag glass" id="replaytag">your story, replayed</div>
+        <div class="buzztag glass" id="buzztag"></div>
         <div class="replaybar glass" id="replaybar">
           <div class="iconbtn" id="rplay">${icon("play", 16)}</div>
           <input type="range" id="rslider" min="0" max="100" value="0" />
@@ -557,6 +617,7 @@ function renderCanvasUI(ctx) {
       <div class="toolbar">
         <div class="swatches" id="swatches"></div>
         <div class="iconbtn hidden" id="reveal" title="Hold to reveal invisible ink">${icon("eye", 17)}</div>
+        <div class="iconbtn" id="ring" title="Ring their phone">${icon("bell", 17)}</div>
         <div class="iconbtn" id="photo" title="Photo background">${icon("image", 17)}</div>
         <div class="iconbtn" id="replaybtn" title="Replay your story">${icon("history", 17)}</div>
         <div class="iconbtn" id="undo" title="Undo my last stroke">${icon("undo", 17)}</div>
@@ -581,6 +642,9 @@ function renderCanvasUI(ctx) {
   let W = 0, H = 0, dpr = 1;
   let bgState = null; // { url, fit, dim }
   let revealing = false; // invisible ink is only drawn while the eye is held
+  // Ring lights up once you've left something — buzz them to a trace, not to
+  // an empty canvas.
+  let ringReady = false;
 
   const strokes = [];
   const live = new Map();
@@ -717,6 +781,74 @@ function renderCanvasUI(ctx) {
     }
     selectBrush(want);
   }));
+
+  /* ---------- buzz: ring their phone ---------- */
+  const ringBtn = document.getElementById("ring");
+  const buzzTag = document.getElementById("buzztag");
+  let ringCooldown = 0, ringTimer = null;
+
+  function paintRing() {
+    ringBtn.classList.toggle("cooling", ringCooldown > 0);
+    ringBtn.classList.toggle("ready", ringCooldown === 0 && ringReady);
+    ringBtn.innerHTML = ringCooldown > 0
+      ? `${icon("bell", 17)}<span class="cd">${ringCooldown}</span>`
+      : icon("bell", 17);
+    ringBtn.title = ringCooldown > 0
+      ? `give them a moment — ${ringCooldown}s`
+      : "Ring their phone";
+  }
+  function startCooldown(seconds) {
+    ringCooldown = seconds;
+    paintRing();
+    clearInterval(ringTimer);
+    ringTimer = setInterval(() => {
+      ringCooldown--;
+      if (ringCooldown <= 0) { clearInterval(ringTimer); ringCooldown = 0; }
+      paintRing();
+    }, 1000);
+  }
+
+  /** What a buzz feels like on this end. */
+  function receiveBuzz() {
+    ringAudio();
+    if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 600]);
+    board.classList.remove("buzzing");
+    void board.offsetWidth; // restart the animation
+    board.classList.add("buzzing");
+    buzzTag.textContent = `${partnerName} is thinking about you`;
+    buzzTag.classList.add("show");
+    setTimeout(() => {
+      buzzTag.classList.remove("show");
+      board.classList.remove("buzzing");
+    }, 3400);
+  }
+
+  ringBtn.addEventListener("click", async () => {
+    if (ringCooldown > 0) return;
+    ringReady = false;
+    // ring their app instantly if it's open...
+    if (subscribed) channel.send({ type: "broadcast", event: "buzz", payload: { from: user.id } });
+    // ...and push to their phone if it isn't. The server owns the rate limit.
+    startCooldown(120);
+    let res = null;
+    try {
+      const r = await supabase.functions.invoke("buzz-partner", { body: { coupleId } });
+      res = r.data;
+    } catch { /* handled below */ }
+    if (res?.sent) {
+      pilltext.textContent = `ringing ${partnerName}…`;
+    } else if (res?.retryAfter) {
+      startCooldown(res.retryAfter);
+      pilltext.textContent = `give them a moment — ${res.retryAfter}s`;
+    } else if (res?.skipped === "partner has no push token") {
+      pilltext.textContent = `rang their app — their phone can't be reached yet`;
+    } else {
+      pilltext.textContent = `couldn't reach them just now`;
+    }
+    pill.classList.add("show");
+    setTimeout(() => pill.classList.remove("show"), 2600);
+  });
+  paintRing();
 
   /* ---------- invisible ink: hold the eye to reveal ---------- */
   let revealTimer = null;
@@ -959,6 +1091,9 @@ function renderCanvasUI(ctx) {
     channel.on("broadcast", { event: "canvas:bg" }, ({ payload }) => {
       setBg(payload.url || null);
     });
+    // Their app is open, so no push will fire — ring it here instead. Same
+    // fast path as strokes.
+    channel.on("broadcast", { event: "buzz" }, () => receiveBuzz());
     channel.on("presence", { event: "sync" }, () => {
       const state = channel.presenceState();
       let online = false, drawing = false;
@@ -1045,6 +1180,8 @@ function renderCanvasUI(ctx) {
     strokes.push(s);
     render();
     syncTierUI();
+    ringReady = true; // you left something — now you can ring them to it
+    paintRing();
     persist(s);
     markToday();
     queueSnapshot();

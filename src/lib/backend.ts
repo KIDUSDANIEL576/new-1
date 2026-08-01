@@ -19,6 +19,7 @@ export const RPCS = {
 
 export const EDGE_FUNCTIONS = {
   notifyPartner: 'notify-partner',
+  buzzPartner: 'buzz-partner',
   signup: 'trace-signup',
   renderSnapshot: 'render-snapshot',
   widgetSnapshot: 'widget-snapshot',
