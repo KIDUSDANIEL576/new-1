@@ -69,6 +69,7 @@ RLS on `realtime.messages`):
 | `stroke:undo` / `canvas:clear` / `canvas:reload` | | mirrored edits |
 | `canvas:bg` | `{url}` | photo background changed |
 | `buzz` | `{from}` | Ring pressed — rings their phone, doesn't just banner it |
+| `live:on` / `live:frame` / `live:off` | `{from, f}` | your face while you draw — frames, never stored |
 
 Presence on the same channel drives the *"…is drawing"* pill. Points are
 normalized 0..1 so both phones render identically. Completed strokes land
@@ -95,7 +96,38 @@ the widget, and 7 days of replay. See [MONETIZATION.md](./MONETIZATION.md).
 can't read until they hold "hold to read". Kept off the widget and out of replay,
 because a secret on the home screen isn't a secret.
 
+**Live** *(web only so far)* — let them watch your face while you draw. Below.
+
 **Buzz** and **accounts** — below.
+
+## Live — let them watch you draw
+
+A toggle in the toolbar puts your face in the corner of their canvas while you
+draw, so they get the grin or the concentration, not just the ink.
+
+**Frames, not video.** A small JPEG (~2–8KB) about 1.5 times a second, sent over
+the realtime channel you're already on and thrown away the moment it's drawn.
+Nothing is uploaded, nothing is written to the database, nothing is recorded —
+each frame exists in two browsers for a few hundred milliseconds and is gone.
+
+Real video would mean WebRTC: a heavy native dependency on the phone plus TURN
+servers to punch through NATs. For *"let them see my face while I draw"*, frames
+are the honest trade — a little choppy, far simpler, and impossible to
+accidentally persist.
+
+**The camera rules, which are the whole point of being careful here:**
+
+- Off by default. It never turns on without you pressing it.
+- A pulsing **"you're live"** badge whenever your camera is running.
+- Stops on: pressing it again, hiding the tab, leaving the page, signing out,
+  and automatically after 5 minutes.
+- Frames are only sent while your partner is actually present — no broadcasting
+  into an empty room.
+- Their pane clears itself if frames stop for 4 seconds, and their face is
+  removed from the DOM rather than just hidden.
+- Audio is never captured. This is a glimpse, not a call.
+
+Web only for now — see STATUS.md.
 
 ## Buzz — ringing their phone
 

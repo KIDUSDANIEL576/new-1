@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0b10" />
 <title>trace — leave me a trace</title>
-<!-- trace-web v4.4 — data export: download everything you've made, drawings included -->
+<!-- trace-web v4.5 — live: your face while you draw, streamed frame by frame, never stored -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -211,6 +211,31 @@
   .iconbtn.on { color: var(--gold); border-color: rgba(244,198,107,.55); background: rgba(244,198,107,.14); }
   .iconbtn.hidden { display: none; }
 
+  /* live glimpse */
+  .livepane {
+    position: absolute; right: 12px; bottom: 12px; z-index: 8;
+    width: 116px; border-radius: 18px; overflow: hidden; display: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  }
+  .livepane img { display: block; width: 100%; height: auto; background: #0a0910; }
+  .livepane .cap {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 5px 8px;
+    font-size: 10.5px; color: #fff; letter-spacing: .3px;
+    background: linear-gradient(transparent, rgba(0,0,0,.72));
+  }
+  .liveself {
+    position: absolute; left: 12px; bottom: 12px; z-index: 8;
+    display: none; align-items: center; gap: 7px;
+    border-radius: 999px; padding: 6px 12px; font-size: 11.5px; font-weight: 600;
+    color: #fff;
+  }
+  .liveself .rec {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--ink);
+    animation: livepulse 1.6s ease-in-out infinite;
+  }
+  @keyframes livepulse { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+  .iconbtn.live { color: #fff; border-color: rgba(226,51,67,.75); background: rgba(226,51,67,.30); }
+
   /* buzz */
   .iconbtn.ready { color: var(--gold); border-color: rgba(244,198,107,.55); background: rgba(244,198,107,.14); }
   .iconbtn.cooling { opacity: .45; pointer-events: none; position: relative; }
@@ -371,6 +396,8 @@ const I = {
   infinity: '<path d="M6 16c3.5 0 5-8 8.5-8a4 4 0 0 1 0 8C11 16 9.5 8 6 8a4 4 0 0 0 0 8"/>',
   heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
+  cam: '<path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
+  camoff: '<path d="M10.66 6H14a2 2 0 0 1 2 2v2.5l5.248-3.062A.5.5 0 0 1 22 7.87v8.196"/><path d="M16 16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2"/><path d="m2 2 20 20"/>',
   bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
 };
 const icon = (n, sz = 18) =>
@@ -737,6 +764,8 @@ function renderCanvasUI(ctx) {
         </div>
         <div class="replaytag glass" id="replaytag">your story, replayed</div>
         <div class="buzztag glass" id="buzztag"></div>
+        <div class="livepane" id="livepane"><img id="liveimg" alt="" /><div class="cap" id="livecap"></div></div>
+        <div class="liveself glass" id="liveself"><span class="rec"></span><span>you're live</span></div>
         <div class="replaybar glass" id="replaybar">
           <div class="iconbtn" id="rplay">${icon("play", 16)}</div>
           <input type="range" id="rslider" min="0" max="100" value="0" />
@@ -758,6 +787,7 @@ function renderCanvasUI(ctx) {
         <div class="swatches" id="swatches"></div>
         <div class="iconbtn hidden" id="reveal" title="Hold to reveal invisible ink">${icon("eye", 17)}</div>
         <div class="iconbtn" id="ring" title="Ring their phone">${icon("bell", 17)}</div>
+        <div class="iconbtn" id="livebtn" title="Let them watch you draw">${icon("cam", 17)}</div>
         <div class="iconbtn" id="photo" title="Photo background">${icon("image", 17)}</div>
         <div class="iconbtn" id="replaybtn" title="Replay your story">${icon("history", 17)}</div>
         <div class="iconbtn" id="undo" title="Undo my last stroke">${icon("undo", 17)}</div>
@@ -921,6 +951,119 @@ function renderCanvasUI(ctx) {
     }
     selectBrush(want);
   }));
+
+  /* ---------- live: let them watch you draw ----------
+     Frames, not video. A small JPEG a couple of times a second, sent over the
+     realtime channel you're already on and thrown away the moment it's drawn.
+     Nothing is uploaded, nothing is written to the database, nothing is
+     recorded — the frame exists in two browsers for a few hundred milliseconds
+     and then it's gone.
+
+     Real video would mean WebRTC: a heavy native dependency on the phone, plus
+     TURN servers to punch through NATs. For "let them see my face while I
+     draw", frames are the honest trade — a little choppy, infinitely simpler,
+     and impossible to accidentally persist. */
+  const LIVE_FPS_MS = 700;   // ~1.4 frames a second
+  const LIVE_W = 192;        // tiny on purpose: ~8KB a frame
+  const LIVE_H = 256;
+  const LIVE_QUALITY = 0.45;
+  const LIVE_MAX_MS = 5 * 60 * 1000;  // never leave a camera on forever
+  const LIVE_STALE_MS = 4000;         // hide their pane if frames stop
+
+  const liveBtn = document.getElementById("livebtn");
+  const livePane = document.getElementById("livepane");
+  const liveImg = document.getElementById("liveimg");
+  const liveCap = document.getElementById("livecap");
+  const liveSelf = document.getElementById("liveself");
+  let liveStream = null, liveVideo = null, liveTimer = null, liveStopTimer = null;
+  let liveStaleTimer = null, partnerOnline = false;
+
+  async function startLive() {
+    if (liveStream) return;
+    try {
+      liveStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: "user" },
+        audio: false, // this is a glimpse, not a call
+      });
+    } catch {
+      pilltext.textContent = "camera blocked — check your browser permissions";
+      pill.classList.add("show");
+      setTimeout(() => pill.classList.remove("show"), 2600);
+      return;
+    }
+    liveVideo = document.createElement("video");
+    liveVideo.srcObject = liveStream;
+    liveVideo.muted = true; liveVideo.playsInline = true;
+    await liveVideo.play().catch(() => {});
+
+    const cv2 = document.createElement("canvas");
+    cv2.width = LIVE_W; cv2.height = LIVE_H;
+    const g2 = cv2.getContext("2d");
+
+    liveBtn.classList.add("live");
+    liveBtn.innerHTML = icon("camoff", 17);
+    liveBtn.title = "Stop letting them watch";
+    liveSelf.style.display = "flex";
+
+    liveTimer = setInterval(() => {
+      if (!liveVideo || liveVideo.readyState < 2) return;
+      // don't broadcast into an empty room
+      if (!subscribed || !partnerOnline) return;
+      // mirror it, so they see you the way you see yourself
+      g2.save();
+      g2.translate(LIVE_W, 0); g2.scale(-1, 1);
+      const vw = liveVideo.videoWidth || 320, vh = liveVideo.videoHeight || 240;
+      const scale = Math.max(LIVE_W / vw, LIVE_H / vh);
+      const dw = vw * scale, dh = vh * scale;
+      g2.drawImage(liveVideo, (LIVE_W - dw) / 2, (LIVE_H - dh) / 2, dw, dh);
+      g2.restore();
+      channel.send({
+        type: "broadcast", event: "live:frame",
+        payload: { from: user.id, f: cv2.toDataURL("image/jpeg", LIVE_QUALITY) },
+      });
+    }, LIVE_FPS_MS);
+
+    if (subscribed) channel.send({ type: "broadcast", event: "live:on", payload: { from: user.id } });
+    clearTimeout(liveStopTimer);
+    liveStopTimer = setTimeout(() => stopLive("timed out after 5 minutes"), LIVE_MAX_MS);
+  }
+
+  function stopLive(reason) {
+    if (!liveStream) return;
+    clearInterval(liveTimer); liveTimer = null;
+    clearTimeout(liveStopTimer); liveStopTimer = null;
+    liveStream.getTracks().forEach(t => t.stop()); // releases the camera light
+    liveStream = null; liveVideo = null;
+    liveBtn.classList.remove("live");
+    liveBtn.innerHTML = icon("cam", 17);
+    liveBtn.title = "Let them watch you draw";
+    liveSelf.style.display = "none";
+    if (subscribed) channel.send({ type: "broadcast", event: "live:off", payload: { from: user.id } });
+    if (reason) {
+      pilltext.textContent = `camera off — ${reason}`;
+      pill.classList.add("show");
+      setTimeout(() => pill.classList.remove("show"), 2600);
+    }
+  }
+
+  liveBtn.addEventListener("click", () => (liveStream ? stopLive() : startLive()));
+
+  function showPartnerFrame(dataUrl) {
+    liveImg.src = dataUrl;
+    liveCap.textContent = partnerName;
+    livePane.style.display = "block";
+    clearTimeout(liveStaleTimer);
+    liveStaleTimer = setTimeout(hidePartnerFrame, LIVE_STALE_MS);
+  }
+  function hidePartnerFrame() {
+    clearTimeout(liveStaleTimer);
+    livePane.style.display = "none";
+    liveImg.removeAttribute("src"); // don't leave their face in the DOM
+  }
+
+  // Leaving the page, backgrounding the tab, or signing out all cut the camera.
+  window.addEventListener("pagehide", () => stopLive());
+  window.addEventListener("beforeunload", () => stopLive());
 
   /* ---------- buzz: ring their phone ---------- */
   const ringBtn = document.getElementById("ring");
@@ -1234,6 +1377,8 @@ function renderCanvasUI(ctx) {
     // Their app is open, so no push will fire — ring it here instead. Same
     // fast path as strokes.
     channel.on("broadcast", { event: "buzz" }, () => receiveBuzz());
+    channel.on("broadcast", { event: "live:frame" }, ({ payload }) => showPartnerFrame(payload.f));
+    channel.on("broadcast", { event: "live:off" }, () => hidePartnerFrame());
     channel.on("presence", { event: "sync" }, () => {
       const state = channel.presenceState();
       let online = false, drawing = false;
@@ -1242,6 +1387,8 @@ function renderCanvasUI(ctx) {
         online = true;
         for (const m of state[key]) if (m.drawing) drawing = true;
       }
+      partnerOnline = online;
+      if (!online) hidePartnerFrame(); // they left; drop their last frame
       document.getElementById("pdot").classList.toggle("on", online);
       document.getElementById("pwho").textContent = online ? partnerName : partnerName + " (offline)";
       if (drawing) { pilltext.textContent = `${partnerName} is drawing…`; pill.classList.add("show"); }
@@ -1488,6 +1635,7 @@ function renderCanvasUI(ctx) {
   document.getElementById("signout").addEventListener("click", () => openAccount());
 
   async function signOutNow() {
+    stopLive();
     if (channel) supabase.removeChannel(channel);
     await supabase.auth.signOut();
     window.__inCanvas = false;
@@ -1664,6 +1812,8 @@ function renderCanvasUI(ctx) {
   }
 
   document.addEventListener("visibilitychange", async () => {
+    // a camera should never keep running behind a hidden tab
+    if (document.visibilityState !== "visible") stopLive();
     if (document.visibilityState === "visible" && subscribed) {
       // coming back is also when a purchase made on the phone should land here
       await refreshTier();

@@ -45,6 +45,17 @@ Free/Pro limits enforced by database triggers, not by the client. RevenueCat
 webhook deployed, idempotent, fails closed. Paywall in both clients. Invisible
 ink shipped as the flagship paid brush.
 
+### Live glimpse ⚠️ web only
+Your face in the corner of their canvas while you draw — JPEG frames over the
+existing realtime channel, ~1.5/sec, never stored or uploaded. Camera is
+opt-in, clearly indicated, and auto-stops on tab-hide, navigation, sign-out and
+a 5-minute cap.
+
+**Not on the phone yet, on purpose.** Expo's camera has no cheap frame-grab API;
+doing this properly on mobile means `react-native-vision-camera` frame
+processors or WebRTC. Neither can be tested without a build, and shipping an
+untestable camera loop is worse than not shipping one.
+
 ### Buzz ✅
 Ring their phone — instant over realtime when their app is open, a
 high-priority push with a custom ring sound when it isn't. Server-side throttle
@@ -68,6 +79,7 @@ password, rename, leave couple, **data export**, and real account deletion.
 | Data export | End-to-end with a **real signed-in JWT**: my strokes exported, partner's counted but excluded, asserted their ink colours appear nowhere in the payload |
 | Snapshot pipeline | Real PNG rendered and served; bad token rejected |
 | Web UI | Browser-tested: paywall, brush locks, invisible-ink reveal + auto-hide, buzz (audio, vibration, cooldown), account panel, delete confirmation, recovery landing, export downloads |
+| Live glimpse | Browser-tested with Chromium's **real** fake capture device: off by default, frames broadcast at a sane ~2KB, partner pane renders and self-clears, camera dies on tab-hide, no frames after stopping |
 | Types | `npm run typecheck` clean |
 | Security advisors | No outstanding findings from any migration in this work |
 
@@ -112,8 +124,8 @@ Safety form, Apple privacy labels, store listing copy and screenshots.
 ## Known gaps
 
 **Functional**
-- The phone app lacks photos, replay, the streak display, and the
-  Together/From/Mine views that the web app has.
+- The phone app lacks photos, replay, the streak display, the live glimpse, and
+  the Together/From/Mine views that the web app has.
 - No email *change* for a confirmed address (only correcting an unconfirmed one).
 
 **Product**
