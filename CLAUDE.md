@@ -114,5 +114,17 @@ Success criteria: two phones, same couple, one draws → other sees strokes appe
 
 ---
 
+## Built beyond this spec (added by request, after Phase 4)
+- **Buzz** — a Ring button that makes the partner's phone ring rather than only
+  banner. Not chat: no message, no thread, one bit of "I'm thinking about you",
+  rate-limited server-side.
+- **Account surface** — email confirmation, password reset, change password,
+  rename, leave couple, data export, and account deletion (App Store 5.1.1(v)
+  makes deletion mandatory for any app with sign-up).
+
+Current state of everything, including what is unverified: **STATUS.md**.
+
+---
+
 ## Non-goals (do NOT build)
 No AI features, no couple pet, no AR, no love weather, no chat, no feed. Five things, polished. Ponytail discipline applies.

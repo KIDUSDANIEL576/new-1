@@ -1,143 +1,168 @@
 # trace
 
-**"Leave me a trace."** A couples app where whatever one partner draws appears on the
-other's phone in real time. Two people, one canvas, forever.
+**"Leave me a trace."** A couples app where whatever one partner draws appears on
+the other's phone in real time. Two people, one canvas, forever.
 
-This is the **Phase 1** build from [CLAUDE.md](./CLAUDE.md): live shared canvas,
-stroke streaming over Supabase Realtime Broadcast, presence, persistence + replay-ready
-history, and throttled partner push.
+Built from [CLAUDE.md](./CLAUDE.md). All four phases plus buzz and the full
+account surface are implemented — see [STATUS.md](./STATUS.md) for exactly what
+is verified, what is deployed, and what is still waiting on an account or a
+build.
 
 ## Stack
 
 - **Expo SDK 52** (React Native, TypeScript, expo-router)
 - **@shopify/react-native-skia** — 60fps stroke rendering
-- **Supabase** — email-OTP auth, Postgres + RLS, Realtime Broadcast + Presence
-- **expo-notifications** + a `notify-partner` edge function
+- **Supabase** — email + password auth, Postgres + RLS, Realtime Broadcast + Presence, Storage
+- **expo-notifications** for push, **RevenueCat** for Trace Forever
+- A no-install **web version** in `web/index.html` on the same backend
+
+## Backend — live
+
+Dedicated Supabase project **`doadibyqqdimzzywcglv`**. Tables are unprefixed and
+every one of them is RLS-locked to couple membership:
+
+`couples` · `members` · `canvases` · `strokes` · `daily_marks` · `push_tokens`
+· `push_log` · `widget_tokens` · `join_attempts` · `entitlements` ·
+`photo_events` · `buzz_log`
+
+Names live in one file: `src/lib/backend.ts`.
+
+Edge functions: `notify-partner`, `buzz-partner`, `render-snapshot`,
+`widget-snapshot`, `revenuecat-webhook`, `delete-account`, `export-my-data`,
+`trace-signup` *(deprecated)*.
+
+`.env.example` ships the live values — the anon key is a public client key by
+design, and RLS is what guards the data.
 
 ## Setup
 
-### 1. Supabase — ALREADY DEPLOYED ✅
-
-The backend is **live** in the DigiRaftHub Supabase project
-(`hnjjxvhutpgcdwyzmito`, eu-central-1), co-tenanting with AICOS because the
-free tier caps active projects at two. Everything is namespaced and additive:
-
-- Tables: `trace_couples`, `trace_members`, `trace_canvases`, `trace_strokes`,
-  `trace_daily_marks`, `trace_push_tokens`, `trace_push_log` — all RLS-locked
-  to couple membership
-- RPCs: `trace_create_couple`, `trace_join_couple`
-- Edge function: `trace-notify-partner` (throttled partner push)
-- Private realtime channels on topics `trace:couple:{id}`
-
-`.env` in this repo already points at it — the app works out of the box.
-The names live in one file: `src/lib/backend.ts`.
-
-**To move to a dedicated project later** (recommended once a free slot or Pro
-plan exists): create the project, run
-`supabase/migrations/20260716000001_init.sql` there (it's the un-prefixed
-dedicated-project version), strip the prefixes in `src/lib/backend.ts`
-(+ `notify-partner` function name), and point `.env` at the new project.
-
-**One manual dashboard step for sign-in codes:** the app asks users for a
-6-digit code, so the email must contain one. In the dashboard →
-Authentication → Email Templates → **Magic Link**, make the body include
-`{{ .Token }}` (e.g. `<h2>Your trace code: {{ .Token }}</h2>`). Takes one
-minute; without it users receive a link instead of a code.
-
-Heads-up: Supabase's built-in email service is rate-limited (~2 OTP emails per
-hour). Fine for the first two-phone test; configure custom SMTP in the
-dashboard before inviting more testers.
-
-**E2E verified 2026-07-16** from inside Supabase infra (two live clients on
-the private channel): stroke:start 153ms, stroke:points 152ms (5/5 points),
-stroke:end 15ms — all under the 300ms bar. RLS verified: an outsider account
-sees zero rows and gets "Unauthorized" joining the couple channel. The
-temporary `trace-e2e-test` edge function is a retired stub — safe to delete.
-
-### 2. App
-
 ```bash
 npm install
-npx expo start   # .env ships pre-filled with the live backend
+cp .env.example .env
+npx expo start        # Expo Go is fine for canvas iteration
 ```
 
-Skia works in Expo Go for quick canvas iteration. **Remote push needs a dev build**
-(`npx expo run:ios` / `run:android`, or EAS) — drawing works fine without it.
+Skia and drawing work in Expo Go. **Push, widgets, the buzz ring sound,
+purchases, and file export all need a real build** — see [MOBILE.md](./MOBILE.md).
 
-### 3. The Phase 1 success criterion
+The web version needs no install at all: open `web/index.html` on any device.
 
-Two phones, same couple: one draws → the other sees strokes appear live in **<300ms**.
+### The Phase 1 success criterion
 
-1. Phone A: sign in → *Create our canvas* → gets a 6-char code.
-2. Phone B: sign in → *Join your person* with the code.
+Two phones, same couple: one draws → the other sees strokes appear live in
+**under 300ms**.
+
+1. Phone A: sign in → *Start our canvas* → gets a 6-character code.
+2. Phone B: sign in → *I have a code* → enter it.
 3. Draw. Watch the other screen.
 
 ## How the realtime protocol works
 
-Channel per couple (`trace:couple:{couple_id}`, private — locked to members via RLS
-on `realtime.messages`):
+Channel per couple (`trace:couple:{couple_id}`, private — locked to members via
+RLS on `realtime.messages`):
 
 | event | payload | when |
 |---|---|---|
 | `stroke:start` | `{strokeId, authorId, brush, color, width}` | finger down |
 | `stroke:points` | `{strokeId, pts: [[x,y],…]}` | batched every ~50ms while drawing |
 | `stroke:end` | `{strokeId, dbId}` | finger up, after the row persists |
-| `stroke:undo` / `canvas:clear` | | mirrored edits |
-| `buzz` | `{from}` | Ring pressed — makes the other phone ring, not just banner |
+| `stroke:undo` / `canvas:clear` / `canvas:reload` | | mirrored edits |
+| `canvas:bg` | `{url}` | photo background changed |
+| `buzz` | `{from}` | Ring pressed — rings their phone, doesn't just banner it |
 
-Presence on the same channel drives the *"…is drawing"* pill. Points are normalized
-0..1 so both phones render identically. Completed strokes land append-only in
-the strokes table — that table **is** Relationship Replay (Phase 2).
+Presence on the same channel drives the *"…is drawing"* pill. Points are
+normalized 0..1 so both phones render identically. Completed strokes land
+append-only in `strokes` — that table **is** Relationship Replay.
 
-## Project layout
+## What's built
 
-```
-app/            expo-router screens (sign-in → verify → pair → canvas)
-src/hooks/      useAuth, useCouple, useSharedCanvas (the realtime core)
-src/components/ CanvasBoard (Skia + gestures), StrokeRenderer, Toolbar, PresencePill
-src/lib/        supabase client, backend names, brushes, notifications
-src/theme/      design tokens from the approved prototype
-supabase/       schema + RLS migration, notify-partner edge function
-```
+**The canvas** — live shared drawing, five brushes, five colours,
+undo-own-stroke, clear, presence, reconnect with backoff, full rehydration on
+open.
+
+**Photos & replay** *(web only so far)* — draw on a photo, scrub your whole story
+back, Daily Love Streak.
+
+**The widget** — iOS WidgetKit (home + lock screen) and an Android home-screen
+widget, both fed by a server-rendered snapshot PNG that re-renders on every
+change.
+
+**Trace Forever** — $29.99 once, unlocks *both* partners because the entitlement
+is keyed by couple, not by user. Free tier gets marker + chalk, one photo a day,
+the widget, and 7 days of replay. See [MONETIZATION.md](./MONETIZATION.md).
+
+**Invisible ink** — the Secret brush writes something they can see is *there* but
+can't read until they hold "hold to read". Kept off the widget and out of replay,
+because a secret on the home screen isn't a secret.
+
+**Buzz** and **accounts** — below.
 
 ## Buzz — ringing their phone
 
 The Ring button lights up once you've finished a trace, so you buzz them to
-something waiting rather than to an empty canvas. It takes two paths at once:
+something waiting rather than to an empty canvas. Two paths at once:
 
-- **Their app is open** — the `buzz` broadcast rings it instantly, same
+- **Their app is open** — the `buzz` broadcast rings it instantly, the same
   sub-300ms path as strokes. No notification would have fired otherwise.
-- **Their app is closed** — `buzz-partner` sends a high-priority push carrying
-  a custom ring sound (`assets/buzz.wav`) on a MAX-importance Android channel
-  with a long vibration.
+- **Their app is closed** — `buzz-partner` sends a high-priority push carrying a
+  custom ring sound (`assets/buzz.wav`) on a MAX-importance Android channel with
+  a long vibration.
 
 **What it can't do, honestly:** ring through silent mode. iOS Critical Alerts
-need an Apple entitlement granted almost exclusively to medical/safety apps,
-and CallKit is contractually VoIP-only — using either here gets the app
-rejected. On a phone that isn't silenced this reads as ringing; on a silenced
-phone it respects the silence.
+need an Apple entitlement granted almost exclusively to medical and safety apps,
+and CallKit is contractually VoIP-only — using either here gets the app rejected.
+On a phone that isn't silenced this reads as ringing; on a silenced phone it
+respects the silence.
 
-**Rate limited on the server**, one buzz per recipient per 2 minutes
-(`buzz_log`, no RLS policies — a client that could forge rows could defeat its
-own limit). The throttle is per *recipient*, so it protects the person being
-buzzed while still letting them buzz straight back. This is an attention weapon
-pointed at someone you love; the limit doesn't belong anywhere the client can
-argue with it.
+**Rate limited on the server**: one buzz per recipient per 2 minutes (`buzz_log`,
+no RLS policies — a client that could forge rows could defeat its own limit).
+Throttled per *recipient*, so it protects the person being buzzed while still
+letting them buzz straight back. This is an attention weapon pointed at someone
+you love; the limit doesn't belong anywhere the client can argue with it.
 
-The ring sound is generated by `assets/make-buzz-sound.py` rather than shipped
-as an opaque blob — two soft sine partials a fifth apart, struck twice, twice.
+The ring is generated by `assets/make-buzz-sound.py` rather than shipped as an
+opaque blob — two soft sine partials a fifth apart, struck twice, twice.
 
 ## Accounts
 
-Rename yourself, change your password, recover a forgotten one, leave your
-couple, and delete your account for good — long-press the wordmark in the app,
-tap the top-right icon on the web. Deleting is real deletion, as App Store
-guideline 5.1.1(v) requires: your ink goes, your partner's stays, and a paid
-Trace Forever stays with whoever remains. You can also **download everything
-you've made** — your strokes as JSON and your drawings as openable SVG, with
-your partner's ink deliberately left out because it's theirs. See
-**ACCOUNT.md** — including the one Supabase redirect-URL setting password reset
-needs.
+Confirm your email, correct a mistyped one, rename yourself, change your
+password, recover a forgotten one, leave your couple, **download everything
+you've made**, and delete your account for good. Long-press the wordmark in the
+app; tap the top-right icon on the web.
+
+Deleting is real deletion, as App Store guideline 5.1.1(v) requires: your ink
+goes, your partner's stays, and a paid Trace Forever stays with whoever remains.
+The export gives you your strokes as JSON *and* your drawings as openable SVG,
+with your partner's ink deliberately left out because it's theirs.
+
+See [ACCOUNT.md](./ACCOUNT.md) — including the one Supabase redirect-URL setting
+password reset needs.
+
+## Project layout
+
+```
+app/              expo-router screens (sign-in → pair → canvas, account)
+src/hooks/        useAuth, useCouple, useSharedCanvas (the realtime core)
+src/components/   CanvasBoard (Skia + gestures), StrokeRenderer, Toolbar,
+                  Paywall, PresencePill, Toast
+src/lib/          supabase, backend names, brushes, notifications, buzz,
+                  entitlements, iap, account, export, widget
+src/widgets/      Android widget surface
+targets/widget/   iOS WidgetKit target (Swift)
+supabase/         migrations + edge functions
+web/index.html    the no-install web version, same backend
+assets/           icons, buzz.wav + the script that generates it
+```
+
+## Docs
+
+| | |
+|---|---|
+| [STATUS.md](./STATUS.md) | What's done, what's verified, what's blocked |
+| [MOBILE.md](./MOBILE.md) | Build and install on real phones |
+| [WIDGET.md](./WIDGET.md) | Adding the home-screen widget |
+| [MONETIZATION.md](./MONETIZATION.md) | Trace Forever, RevenueCat, store setup |
+| [ACCOUNT.md](./ACCOUNT.md) | Deletion, reset, verification, export |
 
 ## What's deliberately not here
 

@@ -59,6 +59,24 @@ npx expo start        # QR code → Expo Go for quick UI iteration
 
 Remote push requires a real build (preview/development profile), not Expo Go.
 
+## What only exists after a build
+
+Drawing works in Expo Go, but these are native modules and appear **only in a
+real build** — if you're testing in Expo Go and one of them seems missing,
+that's why, not a bug:
+
+| Feature | Native module |
+|---|---|
+| Push notifications | `expo-notifications` |
+| Home-screen + lock-screen widgets | `@bacons/apple-targets`, `react-native-android-widget` |
+| Buzz ring sound + vibration | `expo-av`, bundled `assets/buzz.wav` |
+| Trace Forever purchases | `react-native-purchases` |
+| Data export (writing + sharing a file) | `expo-file-system`, `expo-sharing` |
+
+The buzz ring is also a *bundled asset*, registered through the
+`expo-notifications` plugin in `app.json`, so the custom notification sound only
+exists once the app has been rebuilt.
+
 ## Notes
 
 - `.env` values are public client keys; Row Level Security protects the data.
