@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0b10" />
 <title>trace — leave me a trace</title>
-<!-- trace-web v4.2 — account: password reset, change password, rename, leave, delete -->
+<!-- trace-web v4.3 — email verification: confirm on signup, resend, correct a typo -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -242,6 +242,9 @@
     cursor: pointer; background: transparent; color: var(--text); border: 1px solid var(--glass-border);
   }
   .acct .mini:disabled { opacity: .5; cursor: default; }
+  .acct .unverified { margin-top: 14px; border: 1px solid rgba(244,198,107,.4);
+    background: rgba(244,198,107,.07); border-radius: 16px; padding: 14px; }
+  .acct .unverified h3 { color: var(--gold); }
   .acct .danger { margin-top: 18px; border: 1px solid rgba(226,51,67,.35);
     background: rgba(226,51,67,.06); border-radius: 16px; padding: 14px; }
   .acct .danger h3 { color: #ffb9c2; }
@@ -377,9 +380,12 @@ const icon = (n, sz = 18) =>
    it before boot decides anything, or the user lands on their canvas with no
    chance to set the new password they came here for. */
 const IS_RECOVERY = /(^|[#&])type=recovery(&|$)/.test(location.hash);
+// A confirmation link carries a session too, and lands them straight in.
+const IS_CONFIRM = /(^|[#&])type=signup(&|$)/.test(location.hash);
 
 (async function boot() {
   if (IS_RECOVERY) return renderRecovery();
+  if (IS_CONFIRM) history.replaceState(null, "", location.pathname + location.search);
   const { data: { session } } = await supabase.auth.getSession();
   if (session) return openCanvas();
   renderSignIn();
@@ -445,7 +451,9 @@ function renderSignIn() {
     </div>`;
 
   const err = document.getElementById("err");
-  const setBusy = (b) => { document.getElementById("enter").disabled = b; };
+  // null-safe: signIn() can swap the whole screen (check-inbox) before its
+  // finally block runs, at which point #enter no longer exists
+  const setBusy = (b) => { const el = document.getElementById("enter"); if (el) el.disabled = b; };
 
   document.getElementById("enter").addEventListener("click", () => {
     const email = document.getElementById("email").value.trim().toLowerCase();
@@ -478,21 +486,72 @@ function renderSignIn() {
 async function signIn(email, password, err, setBusy) {
   err.textContent = ""; setBusy(true);
   try {
-    let { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      // No account yet? Create one (pre-confirmed) and sign straight in.
-      const r = await fetch(`${SUPABASE_URL}/functions/v1/trace-signup`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      if (r.status === 409) { err.textContent = "That email already has an account — check the password."; return; }
-      if (!r.ok) { err.textContent = "Couldn't create your account — try again."; return; }
-      ({ error } = await supabase.auth.signInWithPassword({ email, password }));
-      if (error) { err.textContent = "Account created — tap Enter once more to sign in."; return; }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error) return;
+
+    // The account exists but was never confirmed — an unfinished step, not a
+    // failure. (Only reachable once "Confirm email" is on in Supabase.)
+    if (/email not confirmed|email_not_confirmed/i.test(error.message ?? "")) {
+      return renderCheckInbox(email);
     }
+
+    // No account yet? Create one through Supabase's standard signup, so the
+    // confirmation email is sent (or not) purely by the project's setting —
+    // the old trace-signup endpoint minted PRE-CONFIRMED accounts, which made
+    // a typo'd address unrecoverable forever.
+    const { data, error: upErr } = await supabase.auth.signUp({
+      email, password, options: { emailRedirectTo: location.href.split("#")[0] },
+    });
+    if (upErr) {
+      err.textContent = /already|registered|exists/i.test(upErr.message)
+        ? "That email already has an account — check the password."
+        : "Couldn't create your account — try again.";
+      return;
+    }
+    // Supabase won't confirm to a stranger that an address is taken; it returns
+    // a user with no identities instead. That's a wrong password, not a signup.
+    if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      err.textContent = "That email already has an account — check the password.";
+      return;
+    }
+    if (!data.session) return renderCheckInbox(email);
   } catch (e) {
     err.textContent = "Network hiccup — try again.";
   } finally { setBusy(false); }
+}
+
+/** Account made, but the emailed link hasn't been clicked yet. */
+function renderCheckInbox(email) {
+  window.__inCanvas = false; window.__onboarding = true;
+  app.innerHTML = `
+    <div class="signin">
+      <div class="wordmark">tra<span class="ce">ce</span></div>
+      <div class="h1">check your<br/><span class="ink">inbox.</span></div>
+      <div class="sub">We sent a confirmation link to <b>${escapeHtml(email)}</b>.
+        Open it and you'll be signed straight in.</div>
+      <div class="sub">Confirming your address is what makes a forgotten password
+        recoverable — without it there's nowhere to send a reset.</div>
+      <button class="btn" id="ci-resend">Resend the link</button>
+      <div class="err" id="ci-note"></div>
+      <button class="linkish" id="ci-other">Wrong address? Use a different one</button>
+    </div>`;
+  const note = document.getElementById("ci-note");
+  document.getElementById("ci-resend").addEventListener("click", async (e) => {
+    e.target.disabled = true;
+    const { error } = await supabase.auth.resend({
+      type: "signup", email,
+      options: { emailRedirectTo: location.href.split("#")[0] },
+    });
+    e.target.disabled = false;
+    note.style.color = "var(--muted)";
+    note.textContent = error
+      ? "Couldn't send that just now — try again shortly."
+      : "Sent. It can take a minute to arrive.";
+  });
+  document.getElementById("ci-other").addEventListener("click", () => {
+    window.__onboarding = false;
+    renderSignIn();
+  });
 }
 
 /* ---------- pairing: start a canvas or join with a code ---------- */
@@ -1442,7 +1501,16 @@ function renderCanvasUI(ctx) {
     sheet.innerHTML = `
       <div class="card glass">
         <h2>Your account</h2>
-        <div class="who2">${escapeHtml(user.email ?? "")}</div>
+        <div class="who2">${escapeHtml(user.email ?? "")}${user.email_confirmed_at ? " · confirmed" : ""}</div>
+        ${user.email_confirmed_at ? "" : `
+        <div class="unverified">
+          <h3>Confirm your email</h3>
+          <p class="help">Until you do, a forgotten password can't be recovered — there's
+            nowhere to send the reset. Mistyped it? Correct it below.</p>
+          <button class="mini" id="ac-resend">Resend the link</button>
+          <input class="field" id="ac-email" type="email" placeholder="a different email" />
+          <button class="mini" id="ac-email-go">Use this address instead</button>
+        </div>`}
 
         <section>
           <h3>Your name</h3>
@@ -1484,6 +1552,33 @@ function renderCanvasUI(ctx) {
     const say = (m) => { note.textContent = m; };
 
     sheet.querySelector("#ac-close").onclick = () => sheet.remove();
+
+    // only present while the address is unconfirmed
+    const resendBtn = sheet.querySelector("#ac-resend");
+    if (resendBtn) {
+      resendBtn.onclick = async () => {
+        const { error } = await supabase.auth.resend({
+          type: "signup", email: user.email,
+          options: { emailRedirectTo: location.href.split("#")[0] },
+        });
+        say(error ? "Couldn't send that just now — try again shortly."
+                  : `Confirmation link sent to ${user.email}.`);
+      };
+      sheet.querySelector("#ac-email-go").onclick = async () => {
+        const next = sheet.querySelector("#ac-email").value.trim().toLowerCase();
+        if (!next.includes("@")) return say("That doesn't look like an email.");
+        const { error } = await supabase.auth.updateUser(
+          { email: next }, { emailRedirectTo: location.href.split("#")[0] });
+        if (error) {
+          return say(/already|registered|exists/i.test(error.message)
+            ? "That address already has an account."
+            : "Couldn't change your email — try again.");
+        }
+        // the change only lands once the NEW address is confirmed, so a typo
+        // here can't strand anyone either
+        say(`Sent a link to ${next}. Your email changes once you open it.`);
+      };
+    }
     sheet.querySelector("#ac-signout").onclick = () => { sheet.remove(); signOutNow(); };
 
     sheet.querySelector("#ac-name-go").onclick = async () => {

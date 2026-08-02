@@ -16,9 +16,11 @@ import { Button, Input, Loading, Screen } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { useCouple } from '@/hooks/useCouple';
 import {
+  changeEmail,
   changePassword,
   deleteAccount,
   leaveCouple,
+  resendVerification,
   setDisplayName,
 } from '@/lib/account';
 import { supabase } from '@/lib/supabase';
@@ -33,7 +35,10 @@ export default function AccountScreen() {
   const [name, setName] = useState<string | null>(null);
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
-  const [busy, setBusy] = useState<null | 'name' | 'password' | 'leave' | 'delete'>(null);
+  const [newEmail, setNewEmail] = useState('');
+  const [busy, setBusy] = useState<
+    null | 'name' | 'password' | 'leave' | 'delete' | 'verify' | 'email'
+  >(null);
 
   if (loading || coupleLoading) return <Loading />;
   if (!session) {
@@ -43,6 +48,31 @@ export default function AccountScreen() {
 
   const email = session.user.email ?? '';
   const displayName = name ?? membership?.displayName ?? '';
+  // An unconfirmed address is a password reset that can never arrive, so this
+  // is worth saying plainly rather than hiding in a settings sub-page.
+  const verified = !!session.user.email_confirmed_at;
+
+  async function onResendVerification() {
+    setBusy('verify');
+    const res = await resendVerification(email);
+    setBusy(null);
+    Alert.alert(
+      res.ok ? 'Sent' : 'Hmm',
+      res.ok ? `A confirmation link is on its way to ${email}.` : res.message
+    );
+  }
+
+  async function onChangeEmail() {
+    setBusy('email');
+    const res = await changeEmail(newEmail);
+    setBusy(null);
+    if (!res.ok) return Alert.alert('Email', res.message);
+    setNewEmail('');
+    Alert.alert(
+      'Confirm the new address',
+      `We sent a link to ${newEmail.trim().toLowerCase()}. Your email changes once you open it — so a typo here can't lock you out either.`
+    );
+  }
 
   async function onSaveName() {
     setBusy('name');
@@ -143,7 +173,42 @@ export default function AccountScreen() {
           </View>
 
           <Text style={styles.h1}>Your account</Text>
-          <Text style={styles.email}>{email}</Text>
+          <Text style={styles.email}>
+            {email}
+            {verified ? ' · confirmed' : ''}
+          </Text>
+
+          {!verified && (
+            <View style={styles.unverified}>
+              <Text style={styles.unverifiedTitle}>Confirm your email</Text>
+              <Text style={styles.help}>
+                Until you do, a forgotten password can&apos;t be recovered — there&apos;s
+                nowhere to send the reset. Mistyped it? Correct it below.
+              </Text>
+              <Button
+                title="Resend the link"
+                variant="ghost"
+                onPress={onResendVerification}
+                loading={busy === 'verify'}
+              />
+              <View style={{ height: 10 }} />
+              <Input
+                value={newEmail}
+                onChangeText={setNewEmail}
+                placeholder="a different email"
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <View style={{ height: 10 }} />
+              <Button
+                title="Use this address instead"
+                variant="ghost"
+                onPress={onChangeEmail}
+                loading={busy === 'email'}
+                disabled={!newEmail.includes('@')}
+              />
+            </View>
+          )}
 
           <Section title="Your name">
             <Text style={styles.help}>This is what your person sees.</Text>
@@ -261,6 +326,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   help: { color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: 12 },
+  unverified: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(244,198,107,0.4)',
+    backgroundColor: 'rgba(244,198,107,0.07)',
+    borderRadius: radius.button,
+    padding: 16,
+  },
+  unverifiedTitle: { color: colors.gold, fontSize: 14, fontWeight: '700', marginBottom: 8 },
   danger: {
     marginTop: 26,
     borderWidth: 1,

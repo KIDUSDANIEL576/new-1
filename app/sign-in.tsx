@@ -10,8 +10,12 @@ import {
   View,
 } from 'react-native';
 import { Button, Input, Screen, Wordmark } from '@/components/ui';
-import { sendPasswordReset } from '@/lib/account';
-import { EDGE_FUNCTIONS } from '@/lib/backend';
+import {
+  isUnverifiedError,
+  resendVerification,
+  sendPasswordReset,
+  signUpWithEmail,
+} from '@/lib/account';
 import { supabase } from '@/lib/supabase';
 import { colors, fonts } from '@/theme/tokens';
 
@@ -19,6 +23,8 @@ export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  // set once an account exists but the emailed link hasn't been clicked yet
+  const [awaitingEmail, setAwaitingEmail] = useState<string | null>(null);
 
   async function enter() {
     const target = email.trim().toLowerCase();
@@ -32,27 +38,37 @@ export default function SignIn() {
     }
     setBusy(true);
     try {
-      let { error } = await supabase.auth.signInWithPassword({ email: target, password });
-      if (error) {
-        // No account yet? Create one (pre-confirmed) and sign straight in.
-        const { error: fnError } = await supabase.functions.invoke(EDGE_FUNCTIONS.signup, {
-          body: { email: target, password },
-        });
-        if (fnError) {
-          const status = (fnError as { context?: { status?: number } }).context?.status;
-          Alert.alert(
-            status === 409 ? 'Welcome back' : 'Could not sign up',
-            status === 409
-              ? 'That email already has an account — check the password.'
-              : 'Try again in a moment.'
-          );
-          return;
-        }
-        ({ error } = await supabase.auth.signInWithPassword({ email: target, password }));
-        if (error) {
-          Alert.alert('Almost', 'Account created — tap Enter once more to sign in.');
-          return;
-        }
+      const { error } = await supabase.auth.signInWithPassword({
+        email: target,
+        password,
+      });
+
+      if (!error) {
+        router.replace('/');
+        return;
+      }
+
+      // The account exists but the address was never confirmed. Not a failure —
+      // just an unfinished step.
+      if (isUnverifiedError(error.message)) {
+        setAwaitingEmail(target);
+        return;
+      }
+
+      // No account yet? Make one. Whether they're let straight in or have to
+      // confirm first is Supabase's "Confirm email" setting, not ours.
+      const res = await signUpWithEmail(target, password);
+      if (res.alreadyRegistered) {
+        Alert.alert('Welcome back', 'That email already has an account — check the password.');
+        return;
+      }
+      if (!res.ok) {
+        Alert.alert('Could not sign up', res.message ?? 'Try again in a moment.');
+        return;
+      }
+      if (res.needsVerification) {
+        setAwaitingEmail(target);
+        return;
       }
       router.replace('/');
     } finally {
@@ -60,8 +76,6 @@ export default function SignIn() {
     }
   }
 
-  // Recovery lands on the web app, which is where the new password is set —
-  // that avoids a deep-link round trip that can't be tested without a build.
   async function forgot() {
     const target = email.trim().toLowerCase();
     if (!target.includes('@')) {
@@ -76,6 +90,19 @@ export default function SignIn() {
       res.ok
         ? `If ${target} has an account, a reset link is on its way. Open it, choose a new password, then come back and sign in.`
         : res.message
+    );
+  }
+
+  if (awaitingEmail) {
+    return (
+      <CheckInbox
+        email={awaitingEmail}
+        onDifferentEmail={() => {
+          setAwaitingEmail(null);
+          setPassword('');
+        }}
+        onDone={() => setAwaitingEmail(null)}
+      />
     );
   }
 
@@ -123,6 +150,65 @@ export default function SignIn() {
           <Text style={styles.forgot}>Forgot your password?</Text>
         </Pressable>
       </KeyboardAvoidingView>
+    </Screen>
+  );
+}
+
+/** Shown when an account exists but its address hasn't been confirmed yet. */
+function CheckInbox({
+  email,
+  onDifferentEmail,
+  onDone,
+}: {
+  email: string;
+  onDifferentEmail: () => void;
+  onDone: () => void;
+}) {
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function resend() {
+    setSending(true);
+    const res = await resendVerification(email);
+    setSending(false);
+    if (!res.ok) {
+      Alert.alert('Hmm', res.message);
+      return;
+    }
+    setSent(true);
+  }
+
+  return (
+    <Screen>
+      <View style={styles.center}>
+        <View style={{ marginBottom: 8 }}>
+          <Wordmark size={34} />
+        </View>
+        <Text style={styles.h1}>
+          check your{'\n'}
+          <Text style={{ color: colors.ink }}>inbox.</Text>
+        </Text>
+        <Text style={styles.sub}>
+          We sent a confirmation link to <Text style={{ color: colors.text }}>{email}</Text>. Open
+          it, then come back and sign in.
+        </Text>
+        <Text style={styles.sub}>
+          Confirming your address is what makes a forgotten password recoverable — without it,
+          there&apos;s nowhere to send a reset.
+        </Text>
+        <View style={{ height: 24 }} />
+        <Button
+          title={sent ? 'Sent — check again' : 'Resend the link'}
+          variant="ghost"
+          onPress={resend}
+          loading={sending}
+        />
+        <View style={{ height: 10 }} />
+        <Button title="I've confirmed — sign in" onPress={onDone} />
+        <Pressable onPress={onDifferentEmail} hitSlop={10} style={styles.forgotWrap}>
+          <Text style={styles.forgot}>Wrong address? Use a different one</Text>
+        </Pressable>
+      </View>
     </Screen>
   );
 }

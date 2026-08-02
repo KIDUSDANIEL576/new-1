@@ -6,6 +6,8 @@ the web.
 
 | | Where |
 |---|---|
+| Confirm your email / resend the link | Account panel (shown until confirmed) |
+| Correct a mistyped email | Account panel |
 | Change your display name | Account panel |
 | Change your password (asks for the current one) | Account panel |
 | Forgot your password | Sign-in screen → *Forgot your password?* |
@@ -94,11 +96,43 @@ same teardown of your ink; the difference is only whether the account survives.
 
 ---
 
+## Email verification
+
+Signup used to go through `trace-signup`, which created **pre-confirmed**
+accounts to skip the email roadblock. That quietly meant a typo'd address was
+unrecoverable — the account worked, but no reset email could ever reach it, so a
+forgotten password was a dead account with no way back in.
+
+Both clients now call Supabase's standard `signUp()`, so the behaviour is
+decided by **one dashboard switch** rather than by our code:
+
+Supabase → **Authentication** → **Providers** → **Email** → **Confirm email**
+
+| | Behaviour |
+|---|---|
+| **OFF** (today) | signUp returns a session — nobody is blocked. The account panel shows a "confirm your email" notice with *Resend* and *correct the address*. |
+| **ON** (once you have SMTP) | signUp returns no session and Supabase sends the email. New accounts land on **check your inbox**, and sign-in stays closed until the link is clicked. |
+
+Same code both ways — there's no flag of ours to keep in sync, and flipping it
+needs no deploy. Turn it on once custom SMTP is configured; the built-in mailer
+is rate-limited to a handful of messages an hour and isn't meant for real users.
+
+The confirmation link lands on the web app, which detects `type=signup` and
+signs them straight in.
+
+**Correcting a mistyped address** sends the confirmation to the *new* address
+and only switches once it's clicked — so a typo at that step can't strand
+anyone either.
+
+`trace-signup` is now deprecated. It stays deployed so older cached web pages
+keep working, and it no longer pre-confirms anything.
+
+---
+
 ## Still missing
 
-- **Email change** — you're stuck with the address you signed up with.
 - **Data export** — no "download everything I've made" yet. Not required by
   either store, but it's the honest companion to a delete button.
-- **Email verification** — accounts are created pre-confirmed by the
-  `trace-signup` function, so a typo'd address is unrecoverable: no reset email
-  can reach it. Worth closing before launch.
+- **Custom SMTP** — until it's configured, confirmation and reset emails go
+  through Supabase's built-in mailer, which is rate-limited and not intended
+  for production traffic. This is the gate on turning "Confirm email" on.

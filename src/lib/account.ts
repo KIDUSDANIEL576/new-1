@@ -21,6 +21,96 @@ export type Outcome = { ok: true } | { ok: false; message: string };
 
 const fail = (message: string): Outcome => ({ ok: false, message });
 
+/* ---------- email verification ----------
+   Deliberately routed through Supabase's own signUp() rather than the old
+   trace-signup endpoint, which minted pre-confirmed accounts. That meant a
+   typo'd address was unrecoverable: no reset email could ever reach it, so a
+   forgotten password meant a dead account.
+
+   Because this is the standard path, the behaviour is decided by one dashboard
+   switch — Authentication → Providers → Email → "Confirm email":
+     OFF (today) → signUp returns a session, nobody is blocked, and the app
+                   shows a gentle "confirm your email" banner.
+     ON  (later) → signUp returns NO session and Supabase sends the email; the
+                   client shows "check your inbox" and sign-in stays closed
+                   until they click it.
+   Same code either way — no flag of ours to keep in sync. */
+
+export interface SignUpOutcome {
+  ok: boolean;
+  /** Account made, but they must click the emailed link before signing in. */
+  needsVerification?: boolean;
+  /** The address is already registered — this is a wrong password, not a new user. */
+  alreadyRegistered?: boolean;
+  message?: string;
+}
+
+export async function signUpWithEmail(
+  email: string,
+  password: string
+): Promise<SignUpOutcome> {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: RECOVERY_URL },
+  });
+
+  if (error) {
+    if (/already|registered|exists/i.test(error.message)) {
+      return { ok: false, alreadyRegistered: true };
+    }
+    return { ok: false, message: 'Could not create your account — try again.' };
+  }
+
+  // Supabase deliberately obfuscates an existing address rather than confirming
+  // it exists to a stranger: it returns a user with an empty identities array
+  // and no session. That is this case, not a new signup.
+  if (data.user && (data.user.identities?.length ?? 0) === 0) {
+    return { ok: false, alreadyRegistered: true };
+  }
+
+  if (!data.session) return { ok: true, needsVerification: true };
+  return { ok: true, needsVerification: false };
+}
+
+/** True when Supabase refused a sign-in purely because the email isn't confirmed. */
+export const isUnverifiedError = (message?: string | null) =>
+  /email not confirmed|email_not_confirmed/i.test(message ?? '');
+
+/** Re-sends the confirmation email — for a link that expired or never arrived. */
+export async function resendVerification(email: string): Promise<Outcome> {
+  const target = email.trim().toLowerCase();
+  if (!target.includes('@')) return fail('Enter the email you signed up with.');
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: target,
+    options: { emailRedirectTo: RECOVERY_URL },
+  });
+  if (error) return fail('Could not send that just now — try again shortly.');
+  return { ok: true };
+}
+
+/**
+ * Correct a mistyped address before it becomes unrecoverable. Supabase sends a
+ * confirmation to the NEW address; the change only takes effect once clicked,
+ * so a typo here can't lock anyone out either.
+ */
+export async function changeEmail(newEmail: string): Promise<Outcome> {
+  const target = newEmail.trim().toLowerCase();
+  if (!target.includes('@')) return fail("That doesn't look like an email.");
+  const { error } = await supabase.auth.updateUser(
+    { email: target },
+    { emailRedirectTo: RECOVERY_URL }
+  );
+  if (error) {
+    if (/already|registered|exists/i.test(error.message)) {
+      return fail('That address already has an account.');
+    }
+    return fail('Could not change your email — try again.');
+  }
+  return { ok: true };
+}
+
 /** Rename yourself. This is the name your partner sees. */
 export async function setDisplayName(name: string): Promise<Outcome> {
   const trimmed = name.trim();
