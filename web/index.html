@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0b10" />
 <title>trace — leave me a trace</title>
-<!-- trace-web v4.1 — buzz: ring your person's phone, throttled server-side -->
+<!-- trace-web v4.2 — account: password reset, change password, rename, leave, delete -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -228,6 +228,26 @@
   }
   .buzztag.show { opacity: 1; }
 
+  /* account */
+  .acct .card { max-width: 420px; padding: 20px; max-height: 88vh; overflow-y: auto; }
+  .acct h2 { font-size: 19px; margin: 0 0 2px; font-weight: 600; }
+  .acct .who2 { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+  .acct section { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 14px; }
+  .acct h3 { font-size: 11.5px; letter-spacing: .6px; text-transform: uppercase;
+    color: var(--text); margin: 0 0 8px; font-weight: 600; }
+  .acct p.help { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 0 0 10px; }
+  .acct .field { margin-top: 8px; }
+  .acct .mini {
+    width: 100%; margin-top: 10px; border-radius: 14px; padding: 12px; font-size: 14px;
+    cursor: pointer; background: transparent; color: var(--text); border: 1px solid var(--glass-border);
+  }
+  .acct .mini:disabled { opacity: .5; cursor: default; }
+  .acct .danger { margin-top: 18px; border: 1px solid rgba(226,51,67,.35);
+    background: rgba(226,51,67,.06); border-radius: 16px; padding: 14px; }
+  .acct .danger h3 { color: #ffb9c2; }
+  .acct .mini.del { border-color: rgba(226,51,67,.55); color: #ff9aa6; font-weight: 600; }
+  .acct .note2 { color: var(--muted); font-size: 12px; margin-top: 10px; min-height: 16px; }
+
   .paywall .card { max-width: 400px; padding: 22px 20px 18px; text-align: center; }
   .paywall .kicker { font-family: Caveat, cursive; font-size: 30px; line-height: 1.05; }
   .paywall .kicker .ink { color: var(--ink); }
@@ -353,15 +373,58 @@ const I = {
 const icon = (n, sz = 18) =>
   `<svg width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
 
+/* A password-recovery link carries its own session in the URL fragment. Detect
+   it before boot decides anything, or the user lands on their canvas with no
+   chance to set the new password they came here for. */
+const IS_RECOVERY = /(^|[#&])type=recovery(&|$)/.test(location.hash);
+
 (async function boot() {
+  if (IS_RECOVERY) return renderRecovery();
   const { data: { session } } = await supabase.auth.getSession();
   if (session) return openCanvas();
   renderSignIn();
 })();
 
 supabase.auth.onAuthStateChange((event, session) => {
+  if (IS_RECOVERY) return; // the recovery screen owns this session
   if (event === "SIGNED_IN" && session && !window.__inCanvas && !window.__onboarding) openCanvas();
 });
+
+function renderRecovery() {
+  window.__inCanvas = false; window.__onboarding = true;
+  app.innerHTML = `
+    <div class="signin">
+      <div class="wordmark">tra<span class="ce">ce</span></div>
+      <div class="h1">a new<br/><span class="ink">password.</span></div>
+      <div class="sub">Choose something you'll remember. You'll be signed straight in.</div>
+      <input class="field" id="np" type="password" placeholder="new password" autocomplete="new-password" />
+      <button class="btn" id="npgo">Set password</button>
+      <div class="err" id="nperr"></div>
+      <button class="linkish" id="npback">Back to sign in</button>
+    </div>`;
+  const np = document.getElementById("np");
+  const err = document.getElementById("nperr");
+  const go = document.getElementById("npgo");
+  np.focus();
+
+  async function submit() {
+    if (np.value.length < 6) { err.textContent = "Use at least 6 characters."; return; }
+    go.disabled = true; go.textContent = "saving…"; err.textContent = "";
+    const { error } = await supabase.auth.updateUser({ password: np.value });
+    go.disabled = false; go.textContent = "Set password";
+    if (error) { err.textContent = "That link has expired — send yourself a new one."; return; }
+    history.replaceState(null, "", location.pathname + location.search);
+    window.__onboarding = false;
+    openCanvas();
+  }
+  go.addEventListener("click", submit);
+  np.addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
+  document.getElementById("npback").addEventListener("click", async () => {
+    await supabase.auth.signOut();
+    history.replaceState(null, "", location.pathname + location.search);
+    location.reload();
+  });
+}
 
 function renderSignIn() {
   window.__inCanvas = false; window.__onboarding = false;
@@ -378,6 +441,7 @@ function renderSignIn() {
       <button class="btn" id="enter">Enter</button>
       <div class="err" id="err"></div>
       <div class="hint">First time? Enter creates your account.<br/>Coming back? It signs you in.</div>
+      <button class="linkish" id="forgot">Forgot your password?</button>
     </div>`;
 
   const err = document.getElementById("err");
@@ -392,6 +456,22 @@ function renderSignIn() {
   });
   document.getElementById("password").addEventListener("keydown", e => {
     if (e.key === "Enter") document.getElementById("enter").click();
+  });
+
+  document.getElementById("forgot").addEventListener("click", async () => {
+    const email = document.getElementById("email").value.trim().toLowerCase();
+    if (!email.includes("@")) return (err.textContent = "Type your email above first.");
+    setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: location.href.split("#")[0],
+    });
+    setBusy(false);
+    // Deliberately says the same thing either way — whether an email has an
+    // account here isn't something a stranger should be able to probe.
+    err.style.color = error ? "" : "var(--muted)";
+    err.textContent = error
+      ? "Couldn't send that just now — try again shortly."
+      : "If that email has an account, a reset link is on its way.";
   });
 }
 
@@ -561,7 +641,8 @@ async function openCanvas() {
 }
 
 function renderCanvasUI(ctx) {
-  const { user, coupleId, canvasId, myName, partnerName } = ctx;
+  const { user, coupleId, canvasId, partnerName } = ctx;
+  let { myName } = ctx; // renamable from the account panel
   const pName = escapeHtml(partnerName);
   app.innerHTML = `
     <div class="stage">
@@ -570,7 +651,7 @@ function renderCanvasUI(ctx) {
         <div class="streak glass zero" id="streak">${icon("flame", 15)}<span id="streakn">0</span></div>
         <div class="tier glass" id="tierpill"></div>
         <div class="who glass"><span class="dot" id="pdot"></span><span id="pwho">${pName}</span></div>
-        <div class="iconbtn" id="signout" title="Sign out">${icon("logout", 16)}</div>
+        <div class="iconbtn" id="signout" title="Your account">${icon("logout", 16)}</div>
       </div>
       <div class="views">
         <div class="view glass sel" data-view="all">${icon("users", 14)} Together</div>
@@ -1344,10 +1425,121 @@ function renderCanvasUI(ctx) {
       }
     }
   });
-  document.getElementById("signout").addEventListener("click", async () => {
+  /* ---------- account ---------- */
+  document.getElementById("signout").addEventListener("click", () => openAccount());
+
+  async function signOutNow() {
     if (channel) supabase.removeChannel(channel);
-    await supabase.auth.signOut(); window.__inCanvas = false; renderSignIn();
-  });
+    await supabase.auth.signOut();
+    window.__inCanvas = false;
+    renderSignIn();
+  }
+
+  function openAccount() {
+    if (document.querySelector(".acct")) return;
+    const sheet = document.createElement("div");
+    sheet.className = "sheet acct";
+    sheet.innerHTML = `
+      <div class="card glass">
+        <h2>Your account</h2>
+        <div class="who2">${escapeHtml(user.email ?? "")}</div>
+
+        <section>
+          <h3>Your name</h3>
+          <p class="help">This is what ${escapeHtml(partnerName)} sees.</p>
+          <input class="field" id="ac-name" maxlength="24" value="${escapeHtml(myName)}" />
+          <button class="mini" id="ac-name-go">Save name</button>
+        </section>
+
+        <section>
+          <h3>Password</h3>
+          <input class="field" id="ac-cur" type="password" placeholder="current password" autocomplete="current-password" />
+          <input class="field" id="ac-new" type="password" placeholder="new password" autocomplete="new-password" />
+          <button class="mini" id="ac-pw-go">Change password</button>
+        </section>
+
+        <section>
+          <h3>Your canvas</h3>
+          <p class="help">Leaving removes your drawings and keeps theirs. You can pair again with a new code afterwards.</p>
+          <button class="mini" id="ac-leave">Leave this canvas</button>
+        </section>
+
+        <section>
+          <h3>Session</h3>
+          <button class="mini" id="ac-signout">Sign out</button>
+        </section>
+
+        <div class="danger">
+          <h3>Delete account</h3>
+          <p class="help">Erases your login, your drawings and your streak, permanently.
+            ${escapeHtml(partnerName)} keeps their own ink. This cannot be undone.</p>
+          <button class="mini del" id="ac-del">Delete my account</button>
+        </div>
+
+        <div class="note2" id="ac-note"></div>
+        <div class="row"><button class="ghost" id="ac-close">Close</button></div>
+      </div>`;
+    document.body.appendChild(sheet);
+    const note = sheet.querySelector("#ac-note");
+    const say = (m) => { note.textContent = m; };
+
+    sheet.querySelector("#ac-close").onclick = () => sheet.remove();
+    sheet.querySelector("#ac-signout").onclick = () => { sheet.remove(); signOutNow(); };
+
+    sheet.querySelector("#ac-name-go").onclick = async () => {
+      const v = sheet.querySelector("#ac-name").value.trim();
+      if (!v) return say("Pick a name they'll recognise.");
+      const { error } = await supabase.rpc("set_display_name", { p_name: v });
+      if (error) return say("Couldn't save that name — try again.");
+      myName = v;
+      say("Name updated.");
+    };
+
+    sheet.querySelector("#ac-pw-go").onclick = async () => {
+      const cur = sheet.querySelector("#ac-cur").value;
+      const nw = sheet.querySelector("#ac-new").value;
+      if (nw.length < 6) return say("Use at least 6 characters.");
+      // re-authenticate first: an unlocked browser shouldn't be enough to lock
+      // the real owner out of their account
+      const { error: reauth } = await supabase.auth.signInWithPassword({
+        email: user.email, password: cur,
+      });
+      if (reauth) return say("That current password is not right.");
+      const { error } = await supabase.auth.updateUser({ password: nw });
+      if (error) return say("Couldn't change your password — try again.");
+      sheet.querySelector("#ac-cur").value = "";
+      sheet.querySelector("#ac-new").value = "";
+      say("Password changed.");
+    };
+
+    sheet.querySelector("#ac-leave").onclick = async () => {
+      if (!confirm(`Leave this canvas? Your drawings are removed. ${partnerName}'s stay.`)) return;
+      const { error } = await supabase.rpc("leave_couple");
+      if (error) return say("Couldn't leave just now — try again.");
+      sheet.remove();
+      if (channel) supabase.removeChannel(channel);
+      window.__inCanvas = false;
+      renderPairing(user);
+    };
+
+    // Two confirmations, the second typed. This is the only irreversible thing
+    // in the app; it should be harder to do by accident than anything else.
+    sheet.querySelector("#ac-del").onclick = async () => {
+      if (!confirm("Delete your account? This erases your login and your drawings for good.")) return;
+      const typed = prompt('This cannot be undone.\n\nType DELETE to confirm.');
+      if (typed !== "DELETE") return say("Not deleted — the confirmation didn't match.");
+      say("Deleting…");
+      const { data, error } = await supabase.functions.invoke("delete-account", {
+        body: { confirm: "DELETE" },
+      });
+      if (error || !data?.deleted) return say("Couldn't delete your account — try again.");
+      if (channel) supabase.removeChannel(channel);
+      await supabase.auth.signOut();
+      sheet.remove();
+      window.__inCanvas = false;
+      renderSignIn();
+    };
+  }
 
   document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === "visible" && subscribed) {

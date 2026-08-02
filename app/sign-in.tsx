@@ -1,7 +1,16 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Button, Input, Screen, Wordmark } from '@/components/ui';
+import { sendPasswordReset } from '@/lib/account';
 import { EDGE_FUNCTIONS } from '@/lib/backend';
 import { supabase } from '@/lib/supabase';
 import { colors, fonts } from '@/theme/tokens';
@@ -51,6 +60,25 @@ export default function SignIn() {
     }
   }
 
+  // Recovery lands on the web app, which is where the new password is set —
+  // that avoids a deep-link round trip that can't be tested without a build.
+  async function forgot() {
+    const target = email.trim().toLowerCase();
+    if (!target.includes('@')) {
+      Alert.alert('Which account?', 'Type your email above first, then tap this.');
+      return;
+    }
+    setBusy(true);
+    const res = await sendPasswordReset(target);
+    setBusy(false);
+    Alert.alert(
+      res.ok ? 'Check your email' : 'Hmm',
+      res.ok
+        ? `If ${target} has an account, a reset link is on its way. Open it, choose a new password, then come back and sign in.`
+        : res.message
+    );
+  }
+
   return (
     <Screen>
       <KeyboardAvoidingView
@@ -91,6 +119,9 @@ export default function SignIn() {
         <Text style={styles.hint}>
           First time? Enter creates your account. Coming back? It signs you in.
         </Text>
+        <Pressable onPress={forgot} hitSlop={10} style={styles.forgotWrap}>
+          <Text style={styles.forgot}>Forgot your password?</Text>
+        </Pressable>
       </KeyboardAvoidingView>
     </Screen>
   );
@@ -106,4 +137,10 @@ const styles = StyleSheet.create({
   },
   sub: { color: colors.muted, fontSize: 15.5, marginTop: 12, maxWidth: 320 },
   hint: { color: colors.muted, fontSize: 12.5, marginTop: 16, textAlign: 'center' },
+  forgotWrap: { marginTop: 14, alignItems: 'center' },
+  forgot: {
+    color: colors.muted,
+    fontSize: 13,
+    textDecorationLine: 'underline',
+  },
 });

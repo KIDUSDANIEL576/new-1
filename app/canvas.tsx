@@ -18,7 +18,6 @@ import { useEntitlement } from '@/lib/entitlements';
 import { configureIap } from '@/lib/iap';
 import { registerPushToken } from '@/lib/notifications';
 import { publishWidgetUrl } from '@/lib/widget';
-import { supabase } from '@/lib/supabase';
 import { colors, radius, swatches } from '@/theme/tokens';
 import type { Brush } from '@/types';
 
@@ -178,15 +177,10 @@ function SharedCanvas({
     ]);
   }
 
+  // long-press the wordmark for account settings — name, password, leaving,
+  // deleting, signing out
   function onWordmarkLongPress() {
-    Alert.alert('Sign out?', undefined, [
-      { text: 'Stay', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: () => supabase.auth.signOut().then(() => router.replace('/sign-in')),
-      },
-    ]);
+    router.push('/account');
   }
 
   return (

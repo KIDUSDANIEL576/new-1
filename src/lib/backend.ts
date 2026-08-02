@@ -15,6 +15,9 @@ export const TABLES = {
 export const RPCS = {
   createCouple: 'create_couple',
   joinCouple: 'join_couple',
+  setDisplayName: 'set_display_name',
+  leaveCouple: 'leave_couple',
+  myStatus: 'my_status',
 } as const;
 
 export const EDGE_FUNCTIONS = {
@@ -23,6 +26,7 @@ export const EDGE_FUNCTIONS = {
   signup: 'trace-signup',
   renderSnapshot: 'render-snapshot',
   widgetSnapshot: 'widget-snapshot',
+  deleteAccount: 'delete-account',
 } as const;
 
 export const coupleChannel = (coupleId: string) => `trace:couple:${coupleId}`;
