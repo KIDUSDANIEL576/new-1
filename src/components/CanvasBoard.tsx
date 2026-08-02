@@ -23,6 +23,8 @@ interface Props {
   onEnd: (strokeId: string) => void;
   /** While true, invisible ink renders legibly. */
   revealing?: boolean;
+  /** Replay is running — look, don't touch. */
+  disabled?: boolean;
 }
 
 const MIN_SEGMENT_PX = 1.5; // same point-thinning as the prototype
@@ -41,6 +43,7 @@ export function CanvasBoard({
   onPoint,
   onEnd,
   revealing = false,
+  disabled = false,
 }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const activeIdRef = useRef<string | null>(null);
@@ -56,6 +59,7 @@ export function CanvasBoard({
 
   const pan = Gesture.Pan()
     .runOnJS(true)
+    .enabled(!disabled)
     .minDistance(1)
     .maxPointers(1)
     .onBegin((e) => {
@@ -126,7 +130,8 @@ export function CanvasBoard({
             ))}
           </Canvas>
         )}
-        {!hasInk && (
+        {/* not during replay: an empty frame at position 0 isn't an empty canvas */}
+        {!hasInk && !disabled && (
           <View pointerEvents="none" style={styles.hintWrap}>
             <Text style={styles.hint}>draw here ✏️</Text>
           </View>

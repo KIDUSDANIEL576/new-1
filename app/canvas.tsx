@@ -6,12 +6,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CanvasBoard } from '@/components/CanvasBoard';
 import { Paywall, type PaywallReason } from '@/components/Paywall';
 import { PresencePill } from '@/components/PresencePill';
+import { ReplayBar } from '@/components/ReplayBar';
+import { ViewTabs, type CanvasView } from '@/components/ViewTabs';
 import { useToast } from '@/components/Toast';
 import { Toolbar } from '@/components/Toolbar';
 import { Button, Loading, Screen, Wordmark } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { useCouple } from '@/hooks/useCouple';
 import { useSharedCanvas } from '@/hooks/useSharedCanvas';
+import { useStreak } from '@/hooks/useStreak';
+import { countPoints, replayPool, sliceStrokes } from '@/lib/replay';
 import { BRUSHES } from '@/lib/brushes';
 import { playBuzz, primeBuzz, releaseBuzz } from '@/lib/buzz';
 import { useEntitlement } from '@/lib/entitlements';
@@ -70,6 +74,11 @@ function SharedCanvas({
   // waiting, not to an empty canvas.
   const [ringReady, setRingReady] = useState(false);
   const [ringCooldown, setRingCooldown] = useState(0);
+  const [view, setView] = useState<CanvasView>('all');
+  const { streak, refresh: refreshStreak } = useStreak(coupleId);
+  const [replay, setReplay] = useState<{ pos: number; total: number; playing: boolean } | null>(
+    null
+  );
 
   const {
     strokes,
@@ -152,6 +161,69 @@ function SharedCanvas({
 
   const hasSecrets = strokes.some((s) => s.brush === 'invisible');
 
+  // A streak takes both of you, so it can change when THEY draw as well —
+  // watch the stroke count rather than only your own finger lifting. Debounced
+  // so a fast exchange doesn't fire a query per stroke.
+  useEffect(() => {
+    const t = setTimeout(() => void refreshStreak(), 2000);
+    return () => clearTimeout(t);
+  }, [strokes.length, refreshStreak]);
+
+  /* ---------- what the board is actually showing ---------- */
+
+  // Views are a lens on one canvas, not three canvases.
+  const inView = useCallback(
+    (authorId: string) =>
+      view === 'all' ? true : view === 'mine' ? authorId === userId : authorId !== userId,
+    [view, userId]
+  );
+
+  // Replay skips invisible ink for the same reason the widget does — and free
+  // couples replay only their recent history.
+  const pool = React.useMemo(
+    () => replayPool(strokes, inView, status.replayDays),
+    [strokes, inView, status.replayDays]
+  );
+  const replayTotal = React.useMemo(() => countPoints(pool), [pool]);
+
+  const shownStrokes = React.useMemo(() => {
+    if (!replay) return strokes.filter((s) => inView(s.authorId));
+    return sliceStrokes(pool, replay.pos);
+  }, [replay, strokes, pool, inView]);
+
+  // playback clock
+  useEffect(() => {
+    if (!replay?.playing) return;
+    const SPEED = 220; // points per second, same feel as the web
+    const started = Date.now();
+    const from = replay.pos;
+    const t = setInterval(() => {
+      const next = from + ((Date.now() - started) / 1000) * SPEED;
+      setReplay((r) => {
+        if (!r) return r;
+        if (next >= replayTotal) return { ...r, pos: replayTotal, playing: false };
+        return { ...r, pos: next };
+      });
+    }, 60);
+    return () => clearInterval(t);
+    // restarting on every pos change would reset the clock, so this intentionally
+    // depends only on the play/pause edge
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replay?.playing, replayTotal]);
+
+  function openReplay() {
+    if (!replayTotal) {
+      toast.show(
+        status.replayDays != null && strokes.length
+          ? `nothing in the last ${status.replayDays} days`
+          : 'nothing to replay yet — draw something first'
+      );
+      if (status.replayDays != null && strokes.length) setPaywall('replay');
+      return;
+    }
+    setReplay({ pos: 0, total: replayTotal, playing: true });
+  }
+
   // the moment the partner first shows up, celebrate + load their name
   const partnerSeenRef = useRef(false);
   useEffect(() => {
@@ -189,6 +261,20 @@ function SharedCanvas({
         <Pressable onLongPress={onWordmarkLongPress}>
           <Wordmark />
         </Pressable>
+        <Pressable
+          style={[styles.streakChip, streak > 0 && styles.streakChipOn]}
+          onPress={() =>
+            toast.show(
+              streak > 0
+                ? `${streak}-day streak — you both drew ${streak} day${streak > 1 ? 's' : ''} in a row`
+                : 'draw on the same day as your person to start a streak'
+            )
+          }
+        >
+          <Text style={[styles.streakText, streak > 0 && { color: colors.gold }]}>
+            🔥 {streak}
+          </Text>
+        </Pressable>
         {!status.isPro && (
           <Pressable style={styles.tierChip} onPress={() => setPaywall('info')}>
             <Text style={styles.tierChipText}>unlock</Text>
@@ -221,9 +307,11 @@ function SharedCanvas({
         </View>
       )}
 
+      <ViewTabs view={view} partnerName={partnerName ?? 'them'} onChange={setView} />
+
       <CanvasBoard
-        strokes={strokes}
-        liveStrokes={liveStrokes}
+        strokes={shownStrokes}
+        liveStrokes={replay ? {} : liveStrokes}
         brush={brush}
         color={color}
         brushWidth={BRUSHES[brush].width}
@@ -234,7 +322,23 @@ function SharedCanvas({
           setRingReady(true); // you left something — now you can ring them to it
         }}
         revealing={revealing}
+        disabled={!!replay}
       />
+
+      {replay && (
+        <ReplayBar
+          position={replay.pos}
+          total={replayTotal}
+          playing={replay.playing}
+          onScrub={(pos) => setReplay((r) => (r ? { ...r, pos, playing: false } : r))}
+          onTogglePlay={() =>
+            setReplay((r) =>
+              r ? { ...r, playing: !r.playing, pos: r.pos >= replayTotal ? 0 : r.pos } : r
+            )
+          }
+          onClose={() => setReplay(null)}
+        />
+      )}
 
       <Toolbar
         brush={brush}
@@ -251,6 +355,9 @@ function SharedCanvas({
         </View>
         <View style={{ flex: 1 }}>
           <Button title="↺ Undo" variant="ghost" onPress={undoLast} disabled={!canUndo} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button title="⟲ Replay" variant="ghost" onPress={openReplay} disabled={!!replay} />
         </View>
         {hasSecrets && (
           <Pressable
@@ -329,6 +436,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   tierChipText: { color: colors.gold, fontSize: 12, fontWeight: '600' },
+  streakChip: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.pill,
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+  },
+  streakChipOn: { borderColor: 'rgba(244,198,107,0.45)' },
+  streakText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   reveal: {
     justifyContent: 'center',
     borderWidth: 1,

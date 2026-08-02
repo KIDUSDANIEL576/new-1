@@ -27,11 +27,14 @@ Shared canvas, 5 brushes, 5 colours, undo-own-stroke, clear, presence pill,
 reconnect with backoff, full rehydration, throttled partner push. Realtime
 streams over private per-couple Broadcast channels.
 
-### Phase 2 — photos & replay ⚠️ web only
-Photo backgrounds with fit/darken, Relationship Replay scrubber, Daily Love
-Streak. **All three exist only in the web app.** The phone app writes streak
-data but never displays a streak, and has no photo picker or replay UI. This is
-the largest functional gap in the project.
+### Phase 2 — photos & replay ⚠️ partly
+- **Replay** ✅ both clients. The phone got a hand-rolled scrubber built on the
+  gesture handler already in the project, rather than a new slider dependency.
+- **Daily Love Streak** ✅ both clients.
+- **Together / From them / My ink views** ✅ both clients.
+- **Photos** ⛔ still web only — needs an image picker and Skia image
+  backgrounds, i.e. new native dependencies that can't be tested without a
+  build. That's the remaining piece of Phase 2 on the phone.
 
 ### Phase 3 — the widget ✅
 iOS WidgetKit (small/medium/large + lock screen), Android home-screen widget,
@@ -80,6 +83,7 @@ password, rename, leave couple, **data export**, and real account deletion.
 | Snapshot pipeline | Real PNG rendered and served; bad token rejected |
 | Web UI | Browser-tested: paywall, brush locks, invisible-ink reveal + auto-hide, buzz (audio, vibration, cooldown), account panel, delete confirmation, recovery landing, export downloads |
 | Live glimpse | Browser-tested with Chromium's **real** fake capture device: off by default, frames broadcast at a sane ~2KB, partner pane renders and self-clears, camera dies on tab-hide, no frames after stopping |
+| Replay + streak logic | `npm test` — 22 assertions over slicing, the free-tier window, invisible-ink exclusion, non-mutation, and the "it takes two" streak rule |
 | Types | `npm run typecheck` clean |
 | Security advisors | No outstanding findings from any migration in this work |
 
@@ -124,8 +128,8 @@ Safety form, Apple privacy labels, store listing copy and screenshots.
 ## Known gaps
 
 **Functional**
-- The phone app lacks photos, replay, the streak display, the live glimpse, and
-  the Together/From/Mine views that the web app has.
+- The phone app lacks **photos** and the **live glimpse** that the web app has.
+  Replay, the streak and the views have landed on both.
 - No email *change* for a confirmed address (only correcting an unconfirmed one).
 
 **Product**

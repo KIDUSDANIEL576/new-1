@@ -40,6 +40,9 @@ design, and RLS is what guards the data.
 npm install
 cp .env.example .env
 npx expo start        # Expo Go is fine for canvas iteration
+
+npm run typecheck     # types
+npm test              # replay + streak logic
 ```
 
 Skia and drawing work in Expo Go. **Push, widgets, the buzz ring sound,
@@ -81,8 +84,11 @@ append-only in `strokes` — that table **is** Relationship Replay.
 undo-own-stroke, clear, presence, reconnect with backoff, full rehydration on
 open.
 
-**Photos & replay** *(web only so far)* — draw on a photo, scrub your whole story
-back, Daily Love Streak.
+**Replay, streak & views** — scrub your whole story back, a Daily Love Streak
+that only counts days you *both* drew, and Together / From them / My ink as a
+lens on the one canvas. All on both clients.
+
+**Photos** *(web only so far)* — draw on a photo with fit and darken controls.
 
 **The widget** — iOS WidgetKit (home + lock screen) and an Android home-screen
 widget, both fed by a server-rendered snapshot PNG that re-renders on every

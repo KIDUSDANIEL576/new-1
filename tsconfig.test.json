@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".test-build",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "skipLibCheck": true
+  },
+  "include": ["src/lib/replay.ts", "src/lib/streak.ts", "src/types.ts"]
+}

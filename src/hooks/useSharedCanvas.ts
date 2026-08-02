@@ -89,7 +89,7 @@ export function useSharedCanvas({
   const refetchStrokes = useCallback(async () => {
     const { data, error } = await supabase
       .from(TABLES.strokes)
-      .select('id, author_id, brush, color, width, points')
+      .select('id, author_id, brush, color, width, points, created_at')
       .eq('canvas_id', canvasId)
       .order('id', { ascending: true });
     if (error || !data) return;
@@ -101,6 +101,7 @@ export function useSharedCanvas({
       color: row.color,
       width: row.width,
       points: row.points as Point[],
+      createdAt: row.created_at as string,
     }));
     setStrokes((prev) => {
       const unpersisted = prev.filter((s) => s.dbId == null);

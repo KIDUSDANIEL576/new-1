@@ -11,6 +11,8 @@ export interface Stroke {
   color: string;
   width: number; // normalized to canvas width (px / canvasWidth)
   points: Point[];
+  /** Set for persisted strokes; absent for ones drawn this session. */
+  createdAt?: string;
 }
 
 // Realtime broadcast payloads (channel `couple:{couple_id}`)
