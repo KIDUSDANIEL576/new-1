@@ -181,6 +181,22 @@ export async function leaveCouple(): Promise<Outcome & { result?: LeaveResult }>
 }
 
 /**
+ * Everything this account has made, as a file they can keep.
+ *
+ * The honest companion to a delete button: you shouldn't be able to erase
+ * something you were never able to take with you. Their strokes are included
+ * in full plus rendered to SVG so a person — not just a parser — can open it;
+ * the partner's ink is counted but not included, because it's the partner's.
+ */
+export async function exportMyData(): Promise<Outcome & { data?: unknown }> {
+  const { data, error } = await supabase.functions.invoke(EDGE_FUNCTIONS.exportMyData, {
+    body: {},
+  });
+  if (error || !data) return fail('Could not build your export — try again.');
+  return { ok: true, data };
+}
+
+/**
  * Delete the account, permanently. The typed confirmation is passed through to
  * the server, which refuses without it.
  */

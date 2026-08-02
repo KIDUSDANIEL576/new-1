@@ -133,8 +133,11 @@ Rename yourself, change your password, recover a forgotten one, leave your
 couple, and delete your account for good — long-press the wordmark in the app,
 tap the top-right icon on the web. Deleting is real deletion, as App Store
 guideline 5.1.1(v) requires: your ink goes, your partner's stays, and a paid
-Trace Forever stays with whoever remains. See **ACCOUNT.md** — including the one
-Supabase redirect-URL setting password reset needs.
+Trace Forever stays with whoever remains. You can also **download everything
+you've made** — your strokes as JSON and your drawings as openable SVG, with
+your partner's ink deliberately left out because it's theirs. See
+**ACCOUNT.md** — including the one Supabase redirect-URL setting password reset
+needs.
 
 ## What's deliberately not here
 

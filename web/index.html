@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0c0b10" />
 <title>trace — leave me a trace</title>
-<!-- trace-web v4.3 — email verification: confirm on signup, resend, correct a typo -->
+<!-- trace-web v4.4 — data export: download everything you've made, drawings included -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -1533,6 +1533,14 @@ function renderCanvasUI(ctx) {
         </section>
 
         <section>
+          <h3>Your data</h3>
+          <p class="help">Everything you've made, as files you keep: your drawings as SVG you
+            can open anywhere, plus your strokes, streak and account details.
+            ${escapeHtml(partnerName)}'s drawings stay theirs — they can export their own.</p>
+          <button class="mini" id="ac-export">Download my data</button>
+        </section>
+
+        <section>
           <h3>Session</h3>
           <button class="mini" id="ac-signout">Sign out</button>
         </section>
@@ -1580,6 +1588,25 @@ function renderCanvasUI(ctx) {
       };
     }
     sheet.querySelector("#ac-signout").onclick = () => { sheet.remove(); signOutNow(); };
+
+    sheet.querySelector("#ac-export").onclick = async () => {
+      const btn = sheet.querySelector("#ac-export");
+      btn.disabled = true; say("Gathering everything…");
+      const { data, error } = await supabase.functions.invoke("export-my-data", { body: {} });
+      btn.disabled = false;
+      if (error || !data) return say("Couldn't build your export — try again.");
+
+      const day = new Date().toISOString().slice(0, 10);
+      download(`trace-export-${day}.json`, JSON.stringify(data, null, 2), "application/json");
+      // the JSON is the record; the SVGs are the actual drawings, openable by
+      // anything. Staggered so browsers don't drop the second download.
+      (data.canvases ?? []).forEach((c, i) => {
+        if (!c.svg) return;
+        setTimeout(() => download(`trace-drawing-${day}-${i + 1}.svg`, c.svg, "image/svg+xml"), 400 * (i + 1));
+      });
+      const n = (data.canvases ?? []).filter(c => c.svg).length;
+      say(`Downloaded your data${n ? ` and ${n} drawing${n > 1 ? "s" : ""}` : ""}.`);
+    };
 
     sheet.querySelector("#ac-name-go").onclick = async () => {
       const v = sheet.querySelector("#ac-name").value.trim();
@@ -1695,6 +1722,14 @@ function openPaywall(reason = "info", onUnlock) {
     if (tier.isPro) onUnlock?.();
     else openPaywall("info", onUnlock);
   };
+}
+
+function download(filename, text, mime) {
+  const url = URL.createObjectURL(new Blob([text], { type: mime }));
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
 function clamp(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }

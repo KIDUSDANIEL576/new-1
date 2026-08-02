@@ -12,6 +12,7 @@ the web.
 | Change your password (asks for the current one) | Account panel |
 | Forgot your password | Sign-in screen → *Forgot your password?* |
 | Leave your couple | Account panel |
+| **Download my data** | Account panel → *Your data* |
 | **Delete your account** | Account panel → red box, two confirmations |
 | Sign out | Account panel |
 
@@ -129,10 +130,39 @@ keep working, and it no longer pre-confirms anything.
 
 ---
 
+## Data export
+
+The honest companion to a delete button: you shouldn't be able to erase
+something you were never able to take with you. Account panel → **Download my
+data**.
+
+**What comes down**
+
+- `trace-export-YYYY-MM-DD.json` — account details, couple, invite code, your
+  streak days, every one of your strokes with brush, colour, timestamps and
+  coordinates, and your Trace Forever purchase record if there is one.
+- `trace-drawing-YYYY-MM-DD-N.svg` — one per canvas. A JSON array of normalized
+  coordinates satisfies portability and tells a human nothing; an SVG opens in
+  any browser. The product is drawings, so the export contains drawings.
+
+On the phone this writes real files and opens the system share sheet, so the
+export can go to Files, Drive, or an email to yourself — data trapped inside
+the app isn't portability in any useful sense.
+
+**What doesn't come down, on purpose**
+
+Your partner's strokes. The canvas is shared, but their ink is their data —
+exporting it here would hand one person a copy of the other's on request. The
+file reports how many of their strokes exist and says they can export their own
+copy from their own account.
+
+Photo links are signed URLs that **expire after seven days**, which the export
+states rather than pretending they're permanent.
+
+---
+
 ## Still missing
 
-- **Data export** — no "download everything I've made" yet. Not required by
-  either store, but it's the honest companion to a delete button.
 - **Custom SMTP** — until it's configured, confirmation and reset emails go
   through Supabase's built-in mailer, which is rate-limited and not intended
   for production traffic. This is the gate on turning "Confirm email" on.

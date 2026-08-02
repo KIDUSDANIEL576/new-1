@@ -19,10 +19,12 @@ import {
   changeEmail,
   changePassword,
   deleteAccount,
+  exportMyData,
   leaveCouple,
   resendVerification,
   setDisplayName,
 } from '@/lib/account';
+import { shareFile, writeCanvasSvgs, writeExport } from '@/lib/export';
 import { supabase } from '@/lib/supabase';
 import { colors, radius } from '@/theme/tokens';
 
@@ -37,7 +39,7 @@ export default function AccountScreen() {
   const [newPw, setNewPw] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [busy, setBusy] = useState<
-    null | 'name' | 'password' | 'leave' | 'delete' | 'verify' | 'email'
+    null | 'name' | 'password' | 'leave' | 'delete' | 'verify' | 'email' | 'export'
   >(null);
 
   if (loading || coupleLoading) return <Loading />;
@@ -150,6 +152,41 @@ export default function AccountScreen() {
         },
       ]
     );
+  }
+
+  async function onExport() {
+    setBusy('export');
+    const res = await exportMyData();
+    if (!res.ok) {
+      setBusy(null);
+      return Alert.alert('Export', res.message);
+    }
+    try {
+      const file = await writeExport(res.data);
+      const svgs = await writeCanvasSvgs(res.data);
+      setBusy(null);
+      const shared = await shareFile(file, 'application/json');
+      if (!shared) {
+        Alert.alert('Saved', `Your export is saved as ${file.name}.`);
+        return;
+      }
+      // offered separately: the JSON is the record, the SVG is the drawing
+      if (svgs.length) {
+        Alert.alert(
+          'Your drawings',
+          `Also saved ${svgs.length} drawing${svgs.length > 1 ? 's' : ''} as SVG. Save ${
+            svgs.length > 1 ? 'them' : 'it'
+          } too?`,
+          [
+            { text: 'No thanks', style: 'cancel' },
+            { text: 'Save', onPress: () => shareFile(svgs[0], 'image/svg+xml') },
+          ]
+        );
+      }
+    } catch {
+      setBusy(null);
+      Alert.alert('Export', 'Could not save the file — check your storage and try again.');
+    }
   }
 
   function onSignOut() {
@@ -270,6 +307,20 @@ export default function AccountScreen() {
               />
             </Section>
           )}
+
+          <Section title="Your data">
+            <Text style={styles.help}>
+              Everything you&apos;ve made, as a file you keep: your drawings (as SVG you can
+              open anywhere), your strokes, your streak and your account details. Your
+              person&apos;s drawings stay theirs — they can export their own.
+            </Text>
+            <Button
+              title="Download my data"
+              variant="ghost"
+              onPress={onExport}
+              loading={busy === 'export'}
+            />
+          </Section>
 
           <Section title="Signing out">
             <Button title="Sign out" variant="ghost" onPress={onSignOut} />

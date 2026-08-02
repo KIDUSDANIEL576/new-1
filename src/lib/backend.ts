@@ -27,6 +27,7 @@ export const EDGE_FUNCTIONS = {
   renderSnapshot: 'render-snapshot',
   widgetSnapshot: 'widget-snapshot',
   deleteAccount: 'delete-account',
+  exportMyData: 'export-my-data',
 } as const;
 
 export const coupleChannel = (coupleId: string) => `trace:couple:${coupleId}`;
