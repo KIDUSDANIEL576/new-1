@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0c0b10" />
+<title>Privacy — trace</title>
+<style>
+  :root { --bg:#0c0b10; --panel:#16151c; --line:rgba(255,255,255,.08);
+    --ink:#e23343; --gold:#f4c66b; --text:#f3f0f4; --muted:#9a93a5; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family: Inter, system-ui, -apple-system, sans-serif; line-height:1.65; }
+  main { max-width: 720px; margin: 0 auto; padding: 48px 24px 80px; }
+  .wordmark { font-size: 32px; font-weight: 700; letter-spacing:.5px; }
+  .wordmark b { color: var(--ink); font-weight:700; }
+  h1 { font-size: 26px; margin: 18px 0 4px; }
+  .updated { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+  h2 { font-size: 17px; margin: 30px 0 8px; color: var(--gold); }
+  p, li { color: var(--text); font-size: 15px; }
+  li { margin: 6px 0; }
+  .muted { color: var(--muted); }
+  a { color: var(--gold); }
+  .card { border:1px solid var(--line); background:var(--panel); border-radius:16px;
+    padding: 16px 18px; margin: 14px 0; }
+  nav a { color: var(--muted); font-size: 13.5px; margin-right: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="wordmark">tra<b>ce</b></div>
+  <nav><a href="./index.html">app</a><a href="./support.html">support</a></nav>
+
+  <h1>Privacy Policy</h1>
+  <div class="updated">Last updated: 2 August 2026</div>
+
+  <p>Trace is a drawing app for two people. This policy says exactly what we
+  store, why, and what we never touch. It is written to be read, not skimmed
+  past.</p>
+
+  <h2>What we collect, and why</h2>
+  <div class="card">
+    <ul>
+      <li><b>Email address and a password</b> — your account. The password is
+        stored only as a cryptographic hash.</li>
+      <li><b>A display name</b> — what your partner sees.</li>
+      <li><b>Your drawings</b> — every stroke you draw (its shape, colour,
+        brush, and time) is stored so it can appear on your partner's device
+        and be replayed later. That is the product.</li>
+      <li><b>Photos you choose to upload</b> as canvas backgrounds — stored
+        privately, visible only to you and your partner.</li>
+      <li><b>A push notification token</b> for your device, so your partner's
+        drawings and rings can reach you.</li>
+      <li><b>Buzz timestamps</b> — when a ring was sent and to whom, kept only
+        to rate-limit ringing. No content, because a buzz has none.</li>
+      <li><b>Purchase records</b> — if you buy Trace Forever, the store and
+        date of purchase, so both of you stay unlocked.</li>
+    </ul>
+  </div>
+
+  <h2>What we deliberately do not do</h2>
+  <div class="card">
+    <ul>
+      <li><b>No ads, no trackers, no analytics SDKs, no data sales.</b> None.</li>
+      <li><b>The live camera glimpse is never stored.</b> When you turn the
+        camera on, frames travel directly to your partner and are discarded on
+        arrival. They are never written to a server, a database, or a disk.
+        Audio is never captured at all.</li>
+      <li><b>Your partner cannot export your drawings.</b> Your ink is yours;
+        each of you can export only your own.</li>
+      <li><b>We cannot read your invisible-ink secrets on your home screen.</b>
+        Secret-brush strokes are excluded from widget images by design.</li>
+    </ul>
+  </div>
+
+  <h2>Where your data lives</h2>
+  <p>All data is stored with <a href="https://supabase.com">Supabase</a>
+  (Postgres database and file storage), protected by row-level security so each
+  couple's data is reachable only by its two members. Push notifications are
+  delivered via Expo's push service, and purchases are processed by Apple,
+  Google, and RevenueCat — payment card details never touch us.</p>
+
+  <h2>Your rights</h2>
+  <div class="card">
+    <ul>
+      <li><b>Export</b> — download everything you've made (your account details,
+        your strokes as data and as images) from the account panel, any time.</li>
+      <li><b>Delete</b> — delete your account from inside the app. This is real
+        deletion: your login, drawings, streak, and tokens are erased. Your
+        partner keeps their own drawings.</li>
+      <li><b>Leave</b> — leave a shared canvas without deleting your account;
+        your drawings go with you.</li>
+    </ul>
+  </div>
+
+  <h2>Data retention</h2>
+  <p>We keep your data for as long as your account exists, because the shared
+  canvas history <i>is</i> the product. Delete your account and it is removed
+  immediately, not archived.</p>
+
+  <h2>Children</h2>
+  <p>Trace is not directed at children under 13 (or the age of digital consent
+  where you live), and we do not knowingly collect data from them.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the date above changes with it, and material
+  changes will be announced inside the app before they take effect.</p>
+
+  <h2>Contact</h2>
+  <p>Questions, requests, complaints:
+  <a href="mailto:kidusdaniel576@gmail.com">kidusdaniel576@gmail.com</a></p>
+</main>
+</body>
+</html>
