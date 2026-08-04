@@ -35,6 +35,9 @@ Add whatever domain you eventually host the web app on too. The app reads this
 from `EXPO_PUBLIC_RECOVERY_URL` (see `.env.example`) so it can move without a
 code change.
 
+The store-required pages live alongside the app and are already published:
+`web/privacy.html` and `web/support.html`.
+
 ---
 
 ## How password reset works

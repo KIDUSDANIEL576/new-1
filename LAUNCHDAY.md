@@ -158,14 +158,40 @@ Without this, drawing/realtime/widgets all work, but Android push (the
 
 ---
 
+## Part 4.5 — your live URLs
+
+These are **live now** — open them on your phone to check:
+
+- App: `https://raw.githack.com/KIDUSDANIEL576/new-1/claude/trace-prototype-mobile-5s5vfd/web/index.html`
+- Privacy: `https://raw.githack.com/KIDUSDANIEL576/new-1/claude/trace-prototype-mobile-5s5vfd/web/privacy.html`
+- Support: `https://raw.githack.com/KIDUSDANIEL576/new-1/claude/trace-prototype-mobile-5s5vfd/web/support.html`
+
+They work, but the URL is ugly and updates lag a few minutes (githack is a CDN
+for source files, not a host). **Optional 3-minute upgrade to a clean domain:**
+
+1. Go to **https://vercel.com/new**
+2. **Import Git Repository** → choose `KIDUSDANIEL576/new-1`
+   (click *Adjust GitHub App Permissions* first if it isn't listed)
+3. **Framework Preset:** Other · **Root Directory:** click *Edit* → type `web`
+4. **Deploy**
+5. When it finishes: **Settings → Git → Production Branch** → change it to
+   `claude/trace-prototype-mobile-5s5vfd` → **Save** → then
+   **Deployments → ⋯ → Redeploy**
+
+You'll get `trace-xxx.vercel.app` — instant updates on every push, and a free
+place to attach a real domain later. Use whichever URL you have in Part 5.
+
+*(I couldn't do this for you: the Vercel account connected to this session
+returned "You don't have permission to create a project.")*
+
 ## Part 5 — Supabase dashboard settings (~10 min)
 
 At **https://supabase.com/dashboard/project/doadibyqqdimzzywcglv**:
 
 1. **Authentication → URL Configuration → Redirect URLs** → **Add URL** →
-   paste the web app's address (the Vercel URL if Claude deployed it, else
-   the raw.githack URL from ACCOUNT.md). Without this, password-reset emails
-   send links that bounce.
+   paste your app URL from Part 4.5 (the Vercel one if you did the upgrade,
+   otherwise the githack one). Without this, password-reset emails send links
+   that bounce.
 2. Send yourself a reset from the sign-in screen ("Forgot your password?")
    and click the link to prove the loop works. Note: the built-in mailer
    allows only a couple of emails per hour — one test, not five.

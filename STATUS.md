@@ -120,8 +120,15 @@ Apple Developer ($99/yr), Play Console ($25 once), a RevenueCat account, and a
 See [MONETIZATION.md](./MONETIZATION.md).
 
 ### 4. Launch paperwork
-Privacy policy and support URLs (both stores require live URLs), Play Data
-Safety form, Apple privacy labels, store listing copy and screenshots.
+**Privacy policy and support pages are written and live** (`web/privacy.html`,
+`web/support.html`) — both stores require these URLs and they now exist.
+Remaining: Play Data Safety form, Apple privacy labels, listing copy and
+screenshots.
+
+Hosting: the web app + pages serve from raw.githack today (works, but cache-laggy
+and an ugly URL). LAUNCHDAY.md Part 4.5 has the 3-minute self-serve Vercel
+upgrade — I couldn't do it directly because the connected Vercel account lacks
+project-creation permission.
 
 ---
 
@@ -141,6 +148,10 @@ Safety form, Apple privacy labels, store listing copy and screenshots.
 
 **Housekeeping**
 - `trace-rt-boot` is a retired E2E test stub still deployed — safe to delete.
+- A `web` edge function was deployed then abandoned: Supabase's gateway forces
+  `text/plain` and injects `default-src 'none'; sandbox` on function responses,
+  which kills all scripts and styles. Edge functions cannot host pages. Inert —
+  nothing references it — but safe to delete.
 - `trace-signup` is deprecated but kept live so older cached web pages keep
   working.
 
